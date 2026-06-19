@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "name": "Temporary Static Publisher",
+  "description": "Publishes HTML, Markdown, or prebuilt static-site ZIPs at immutable URLs for exactly 30 days.",
+  "documentation_url": "/",
+  "openapi_url": "/openapi.json",
+  "llms_txt_url": "/llms.txt",
+  "health_url": "/healthz",
+  "instructions": "Publish the build output, not project source. Send one POST to /api/v1/publish and return the response url and expiresAt to the user.",
+  "capabilities": {
+    "publish": {
+      "method": "POST",
+      "path": "/api/v1/publish",
+      "content_types": ["text/html", "text/markdown", "application/zip"],
+      "spa_query": "spa=1",
+      "fixed_ttl_hours": 720,
+      "authentication": "none"
+    }
+  },
+  "constraints": [
+    "Static output only; uploaded code is not executed.",
+    "ZIP archives must contain index.html at the root.",
+    "Always use the URL returned by the publish response."
+  ]
+}

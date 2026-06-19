@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "method": { "type": "string", "enum": ["POST"] },
+    "endpoint": { "type": "string" },
+    "contentType": { "type": "string", "enum": ["text/html"] },
+    "body": { "type": "string" },
+    "spa": { "type": "boolean" },
+    "ttlHours": { "type": "integer", "enum": [720] }
+  },
+  "required": ["method", "endpoint", "contentType", "body", "spa", "ttlHours"],
+  "additionalProperties": false
+}

@@ -1,0 +1,73 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Temporary Static Publisher API",
+    "version": "1.0.0",
+    "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site. Every immutable deployment expires exactly 30 days after successful publication. Uploaded code is never executed."
+  },
+  "servers": [{"url": "/", "description": "Current service origin"}],
+  "paths": {
+    "/api/v1/publish": {
+      "post": {
+        "operationId": "publish",
+        "summary": "Publish an immutable temporary static site",
+        "description": "Send one raw request body. ZIP files must contain index.html at their root. Build source projects before calling this endpoint. Returns only after atomic publication.",
+        "parameters": [{
+          "name": "spa",
+          "in": "query",
+          "required": false,
+          "description": "Set to 1 to serve index.html for paths that do not match a real file.",
+          "schema": {"type": "string", "enum": ["0", "1"], "default": "0"}
+        }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/html": {"schema": {"type": "string", "contentMediaType": "text/html"}},
+            "text/markdown": {"schema": {"type": "string", "contentMediaType": "text/markdown"}},
+            "application/zip": {"schema": {"type": "string", "contentEncoding": "base64", "contentMediaType": "application/zip"}}
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Published",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-07-19T14:30:00Z","files":37,"bytes":1842032,"spa":true}}}
+          },
+          "400": {"$ref": "#/components/responses/ClientError"},
+          "413": {"$ref": "#/components/responses/ClientError"},
+          "415": {"$ref": "#/components/responses/ClientError"},
+          "429": {"$ref": "#/components/responses/ClientError"},
+          "500": {"$ref": "#/components/responses/ServerError"},
+          "503": {"$ref": "#/components/responses/ServerError"}
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "Check service readiness",
+        "responses": {"200": {"description": "Service and storage are ready", "content": {"application/json": {"schema": {"type":"object","additionalProperties":true}}}}, "503": {"description": "Service is not ready"}}
+      }
+    },
+    "/p/{id}/{path}": {
+      "get": {
+        "operationId": "getPublishedFile",
+        "summary": "Read a file from a path-mode deployment",
+        "parameters": [
+          {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
+          {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."}
+        ],
+        "responses": {"200":{"description":"Published static content"},"404":{"description":"Deployment or file not found"},"410":{"description":"Deployment expired"}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"Exactly 720 hours after createdAt."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"}}},
+      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["unsupported_media_type","upload_too_large","too_many_files","invalid_archive","missing_index","rate_limited","insufficient_storage","service_unavailable"]},"message":{"type":"string"},"details":{"type":"object","additionalProperties":true},"docsUrl":{"type":"string","format":"uri"}}}}}
+    },
+    "responses": {
+      "ClientError": {"description":"The upload was rejected", "content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},
+      "ServerError": {"description":"The service cannot publish right now", "content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}
+    }
+  }
+}

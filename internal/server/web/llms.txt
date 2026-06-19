@@ -1,0 +1,33 @@
+# Temporary Static Publisher
+
+Publish HTML, Markdown, or a ZIP containing a prebuilt static site with one HTTP request. No authentication is required at the application layer. Every deployment is immutable and deleted exactly 30 days (720 hours) after successful publication.
+
+## Agent behavior
+
+Publish the build output, not source code. After success, return the response `url` and `expiresAt` timestamp to the user.
+
+## API
+
+- POST /api/v1/publish
+- Optional query `spa=1` enables index.html fallback for client-side routing.
+- Content-Type: `text/html`, `text/markdown`, or `application/zip`.
+- GET /healthz checks readiness.
+- GET /openapi.json provides the complete machine-readable contract.
+- Path-mode content is served at `/p/{id}/`; deployments may instead use `https://{id}.<preview-domain>/` when wildcard hosting is configured. Always use the returned URL.
+
+## Examples
+
+HTML:
+`curl -sS -X POST "$ORIGIN/api/v1/publish" -H "Content-Type: text/html" --data-binary @index.html`
+
+Markdown:
+`curl -sS -X POST "$ORIGIN/api/v1/publish" -H "Content-Type: text/markdown" --data-binary @report.md`
+
+Node static build:
+`npm ci && npm run build`
+`(cd dist && zip -qr ../site.zip .)`
+`curl -sS -X POST "$ORIGIN/api/v1/publish?spa=1" -H "Content-Type: application/zip" --data-binary @site.zip`
+
+The ZIP must contain `index.html` at its root. The service never runs Node.js, npm, SSR, server code, APIs, databases, or build commands.
+
+Defaults: 100 MB compressed upload, 500 MB expanded ZIP, 10,000 files, 60 publishes/hour/IP. Dangerous paths, symlinks, duplicate normalized paths, devices, and archive bombs are rejected.
