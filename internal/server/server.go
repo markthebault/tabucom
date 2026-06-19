@@ -25,11 +25,15 @@ import (
 	"time"
 )
 
-const metadataName = ".site.json"
+const (
+	metadataName  = ".site.json"
+	deploymentTTL = 30 * 24 * time.Hour
+)
 
 //go:embed web web/.well-known/agent.json
 var embeddedWeb embed.FS
 
+// Config controls server behavior and operational limits.
 type Config struct {
 	ListenAddr       string
 	DataDir          string
@@ -44,10 +48,12 @@ type Config struct {
 	Now              func() time.Time
 }
 
+// DefaultConfig returns the supported production defaults.
 func DefaultConfig() Config {
-	return Config{ListenAddr: ":8080", DataDir: "./data", TTL: 720 * time.Hour, SweepInterval: time.Hour, MaxUploadBytes: 100 << 20, MaxExpandedSize: 500 << 20, MaxFiles: 10000, RateLimitPerHour: 60, Now: time.Now}
+	return Config{ListenAddr: ":8080", DataDir: "./data", TTL: deploymentTTL, SweepInterval: time.Hour, MaxUploadBytes: 100 << 20, MaxExpandedSize: 500 << 20, MaxFiles: 10000, RateLimitPerHour: 60, Now: time.Now}
 }
 
+// ConfigFromEnv builds a Config from supported environment variables.
 func ConfigFromEnv() (Config, error) {
 	c := DefaultConfig()
 	if v := os.Getenv("LISTEN_ADDR"); v != "" {
@@ -115,6 +121,7 @@ func (c Config) validate() error {
 	return nil
 }
 
+// Metadata describes one published deployment.
 type Metadata struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -129,6 +136,7 @@ type publishResponse struct {
 	URL string `json:"url"`
 }
 
+// Server publishes and serves immutable temporary deployments.
 type Server struct {
 	cfg       Config
 	sites     string
@@ -144,6 +152,7 @@ type rateBucket struct {
 	count int
 }
 
+// New initializes a server and performs an initial expiry sweep.
 func New(cfg Config) (*Server, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
@@ -163,6 +172,7 @@ func New(cfg Config) (*Server, error) {
 	return s, nil
 }
 
+// Close stops background cleanup and waits for it to exit.
 func (s *Server) Close() { s.closeOnce.Do(func() { close(s.stop); <-s.done }) }
 
 func (s *Server) sweeper() {
@@ -181,6 +191,7 @@ func (s *Server) sweeper() {
 	}
 }
 
+// ServeHTTP routes publish, health, docs, and deployment requests.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Preview subdomains are isolated static origins, never API origins.
 	if id, subpath, ok := s.wildcardSiteRequest(r); ok {
@@ -297,6 +308,11 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 400, "invalid_spa", "spa must be 1, 0, true, or false")
 		return
 	}
+	ttl, err := parseTTL(r.URL.Query().Get("ttl"), s.cfg.TTL)
+	if err != nil {
+		apiError(w, 400, "invalid_ttl", "ttl must be a positive duration such as 72h or 90m")
+		return
+	}
 	if r.ContentLength > s.cfg.MaxUploadBytes {
 		apiError(w, 413, "upload_too_large", "request body exceeds upload limit")
 		return
@@ -358,12 +374,13 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if _, err := os.Stat(filepath.Join(stage, "index.html")); err != nil {
+	indexInfo, err := os.Stat(filepath.Join(stage, "index.html"))
+	if err != nil || !indexInfo.Mode().IsRegular() {
 		apiError(w, 400, "missing_index", "site must contain index.html at its root")
 		return
 	}
 	now := s.cfg.Now().UTC()
-	meta := Metadata{ID: id, CreatedAt: now, ExpiresAt: now.Add(s.cfg.TTL), Files: files, Bytes: size, SPA: spa}
+	meta := Metadata{ID: id, CreatedAt: now, ExpiresAt: now.Add(ttl), Files: files, Bytes: size, SPA: spa}
 	metaBytes, _ := json.Marshal(meta)
 	if err := os.WriteFile(filepath.Join(stage, metadataName), metaBytes, 0640); err != nil {
 		apiError(w, 500, "internal_error", "could not write metadata")
@@ -434,6 +451,7 @@ func (s *Server) extractZip(dst, archivePath string) (int, int64, error) {
 	defer zr.Close()
 	seen := map[string]bool{}
 	files := 0
+	entries := 0
 	var total int64
 	for _, f := range zr.File {
 		name := strings.ReplaceAll(f.Name, "\\", "/")
@@ -451,6 +469,10 @@ func (s *Server) extractZip(dst, archivePath string) (int, int64, error) {
 			return 0, 0, invalidZip("invalid_archive", "ZIP contains duplicate normalized paths")
 		}
 		seen[key] = true
+		entries++
+		if entries > s.cfg.MaxFiles {
+			return 0, 0, &publishError{413, "too_many_files", "ZIP exceeds entry count limit"}
+		}
 		mode := f.Mode()
 		if mode&os.ModeSymlink != 0 || mode&os.ModeType != 0 && !mode.IsDir() {
 			return 0, 0, invalidZip("invalid_archive", "ZIP links and special files are not allowed")
@@ -458,19 +480,16 @@ func (s *Server) extractZip(dst, archivePath string) (int, int64, error) {
 		target := filepath.Join(dst, filepath.FromSlash(clean))
 		if isDir || mode.IsDir() {
 			if err := os.MkdirAll(target, 0750); err != nil {
-				return 0, total, err
+				return 0, total, invalidZip("invalid_archive", "ZIP contains conflicting paths")
 			}
 			continue
 		}
 		files++
-		if files > s.cfg.MaxFiles {
-			return 0, 0, &publishError{413, "too_many_files", "ZIP exceeds file count limit"}
-		}
 		if f.UncompressedSize64 > uint64(s.cfg.MaxExpandedSize) || total > s.cfg.MaxExpandedSize-int64(f.UncompressedSize64) {
 			return 0, 0, &publishError{413, "upload_too_large", "ZIP exceeds expanded size limit"}
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0750); err != nil {
-			return 0, total, err
+			return 0, total, invalidZip("invalid_archive", "ZIP contains conflicting paths")
 		}
 		rc, err := f.Open()
 		if err != nil {
@@ -479,6 +498,9 @@ func (s *Server) extractZip(dst, archivePath string) (int, int64, error) {
 		out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0640)
 		if err != nil {
 			rc.Close()
+			if errors.Is(err, os.ErrExist) {
+				return 0, total, invalidZip("invalid_archive", "ZIP contains conflicting paths")
+			}
 			return 0, total, err
 		}
 		n, cpErr := io.Copy(out, io.LimitReader(rc, s.cfg.MaxExpandedSize-total+1))
@@ -532,7 +554,8 @@ func (s *Server) wildcardSiteRequest(r *http.Request) (string, string, bool) {
 func (s *Server) serveSite(w http.ResponseWriter, r *http.Request, id, requested string) {
 	root := filepath.Join(s.sites, id)
 	meta, err := readMetadata(root)
-	if err != nil || !meta.ExpiresAt.After(s.cfg.Now()) {
+	now := s.cfg.Now().UTC()
+	if err != nil || !meta.ExpiresAt.After(now) {
 		http.NotFound(w, r)
 		return
 	}
@@ -562,8 +585,23 @@ func (s *Server) serveSite(w http.ResponseWriter, r *http.Request, id, requested
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.Header().Set("Cache-Control", deploymentCacheControl(meta.ExpiresAt, now))
 	http.ServeFile(w, r, file)
+}
+
+func deploymentCacheControl(expiresAt, now time.Time) string {
+	remaining := expiresAt.Sub(now)
+	if remaining <= 0 {
+		return "no-store"
+	}
+	if remaining < time.Second {
+		return "public, max-age=0, must-revalidate"
+	}
+	maxAge := int(remaining / time.Second)
+	if maxAge > 300 {
+		maxAge = 300
+	}
+	return "public, max-age=" + strconv.Itoa(maxAge) + ", must-revalidate"
 }
 
 func readMetadata(root string) (Metadata, error) {
@@ -575,6 +613,7 @@ func readMetadata(root string) (Metadata, error) {
 	return m, e
 }
 
+// Sweep removes expired deployments and stale staging directories.
 func (s *Server) Sweep() error {
 	entries, err := os.ReadDir(s.sites)
 	if err != nil {
@@ -666,6 +705,17 @@ func parseBool(v string) (bool, error) {
 	default:
 		return false, errors.New("invalid boolean")
 	}
+}
+
+func parseTTL(v string, fallback time.Duration) (time.Duration, error) {
+	if v == "" {
+		return fallback, nil
+	}
+	ttl, err := time.ParseDuration(v)
+	if err != nil || ttl <= 0 {
+		return 0, errors.New("invalid ttl")
+	}
+	return ttl, nil
 }
 
 // renderMarkdown deliberately implements a small, safe subset. All source text is

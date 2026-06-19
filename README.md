@@ -1,15 +1,17 @@
-# Temporary Static Publisher
+# Tabucom
 
-A single-container internal service for publishing HTML, Markdown, or complete prebuilt static sites at temporary URLs. Every immutable deployment expires exactly 30 days after it is created. There are no accounts, update operations, or application-level authentication.
+A single-container internal service for publishing HTML, Markdown, or complete prebuilt static sites at temporary URLs. Every immutable deployment expires at the client-requested TTL, or after the default 30-day retention window when omitted. There are no accounts, update operations, or application-level authentication.
 
 The service hosts static output only. Build a Node project locally or in CI and upload its `dist/` or `build/` output; the server never runs npm, Node.js, SSR, or uploaded code.
+
+This is designed for internal use behind network controls. Operators should put the publish host behind VPN, SSO, or another trusted ingress layer before exposing it to humans or agents.
 
 ## Run locally
 
 With Go installed:
 
 ```sh
-go run ./cmd/here-now-alt
+go run ./cmd/tabucom
 ```
 
 Then open <http://localhost:8080/> or check readiness:
@@ -25,14 +27,14 @@ Local data is stored under the configured `DATA_DIR`. Use a disposable directory
 Build and start the one-container service with a persistent volume:
 
 ```sh
-docker build -t temporary-publisher .
+docker build -t tabucom .
 docker run --rm -p 8080:8080 \
   -e PUBLIC_API_URL=http://localhost:8080 \
-  -v publisher-data:/data \
-  temporary-publisher
+  -v tabucom-data:/data \
+  tabucom
 ```
 
-In production, terminate TLS at the company ingress and mount persistent storage at `/data`. Restrict the publish host to the corporate network or VPN. If wildcard DNS/TLS is configured, route both the publish host and `*.$PREVIEW_DOMAIN` to this container.
+In production, terminate TLS at the company ingress and mount persistent storage at `/data`. Set `PUBLIC_API_URL` to the externally reachable publish origin so returned deployment URLs do not depend on proxy headers. Restrict the publish host to the corporate network or VPN. If wildcard DNS/TLS is configured, route both the publish host and `*.$PREVIEW_DOMAIN` to this container.
 
 ## Configuration
 
@@ -41,16 +43,16 @@ In production, terminate TLS at the company ingress and mount persistent storage
 | `PORT` | `8080` | HTTP listen port (overrides `LISTEN_ADDR`). |
 | `LISTEN_ADDR` | `:8080` | Full listen address when `PORT` is unset. |
 | `DATA_DIR` | `./data` (`/data` in container) | Persistent sites, metadata, and temporary uploads. |
-| `TTL` | `720h` | Deployment retention. Production policy is fixed at 30 days. |
+| `TTL` | `720h` | Default deployment retention when the publish request omits `ttl`. |
 | `SWEEP_INTERVAL` | `1h` | How often expired deployments are removed. |
 | `PUBLIC_API_URL` | Request origin | External publishing origin used in links and responses. |
 | `PREVIEW_DOMAIN` | empty | Optional wildcard preview domain. Empty selects `/p/{id}/` path URLs. |
 | `MAX_UPLOAD_BYTES` | `104857600` | Maximum compressed request size (100 MB). |
 | `MAX_EXPANDED_BYTES` | `524288000` | Maximum extracted ZIP size (500 MB). |
-| `MAX_FILES` | `10000` | Maximum number of files in a ZIP. |
-| `RATE_LIMIT_PER_HOUR` | `60` | Maximum publish requests per client IP per hour. |
+| `MAX_FILES` | `10000` | Maximum number of ZIP entries, including directories. |
+| `RATE_LIMIT_PER_HOUR` | `60` | Maximum publish requests per network peer per hour. |
 
-See the landing page and `internal/server/web/openapi.json` for file-count and rate limits and the full API contract.
+Clients can override deployment lifetime per request with `?ttl=<duration>`. When omitted, the service default remains `720h`. See the landing page and `internal/server/web/openapi.json` for entry-count and rate limits and the full API contract.
 
 ## Publish
 
@@ -81,7 +83,9 @@ curl -sS -X POST 'http://localhost:8080/api/v1/publish?spa=1' \
   --data-binary @site.zip
 ```
 
-The ZIP must have `index.html` at its root. `spa=1` makes unknown paths fall back to `index.html`; omit it for normal static 404 behavior. Always use the `url` returned in the `201` JSON response and report both `url` and `expiresAt` to the user.
+To choose a custom lifetime, add a `ttl` query parameter with a positive duration such as `?ttl=72h` or `?spa=1&ttl=168h`. The ZIP must have a regular `index.html` file at its root. `spa=1` makes unknown paths fall back to `index.html`; omit it for normal static 404 behavior. Always use the `url` returned in the `201` JSON response and report both `url` and `expiresAt` to the user.
+
+ZIP extraction is defensive. Archives with traversal, absolute paths, duplicate normalized paths, conflicting file and directory paths, symlinks, device files, excessive nesting, or size and entry-count overages are rejected.
 
 ## Discovery
 
@@ -90,6 +94,10 @@ The ZIP must have `index.html` at its root. `spa=1` makes unknown paths fall bac
 - `/llms.txt` — compact agent instructions
 - `/.well-known/agent.json` — structured discovery metadata
 - `/healthz` — readiness check
+
+## Security Model
+
+Uploaded HTML, CSS, and JavaScript run in the viewer's browser. In path mode, deployments under `/p/{id}/` share the same browser origin as the service landing page and API. That means untrusted content can interact with same-origin browser storage for that host. If you need origin isolation or root-relative asset paths, configure `PREVIEW_DOMAIN` and serve deployments from wildcard subdomains instead.
 
 ## Development
 

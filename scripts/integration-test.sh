@@ -3,7 +3,7 @@ set -eu
 
 BASE_URL=${BASE_URL:-http://127.0.0.1:8080}
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/publisher-test.XXXXXX")
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/tabucom-test.XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }

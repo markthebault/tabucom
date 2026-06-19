@@ -6,7 +6,7 @@ CODEX_PROVIDER_MODE=${CODEX_PROVIDER_MODE:-local}
 CODEX_LOCAL_PROVIDER=${CODEX_LOCAL_PROVIDER:-lmstudio}
 CODEX_MODEL=${CODEX_MODEL:-}
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/publisher-codex.XXXXXX")
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/tabucom-codex.XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
 
 command -v codex >/dev/null 2>&1 || { printf 'codex CLI is required\n' >&2; exit 1; }

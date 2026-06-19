@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Temporary Static Publisher API",
+    "title": "Tabucom API",
     "version": "1.0.0",
-    "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site. Every immutable deployment expires exactly 30 days after successful publication. Uploaded code is never executed."
+    "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site. Deployments expire at the client-requested TTL or after the default 30-day retention window when omitted. Uploaded code is never executed."
   },
   "servers": [{"url": "/", "description": "Current service origin"}],
   "paths": {
@@ -12,25 +12,34 @@
         "operationId": "publish",
         "summary": "Publish an immutable temporary static site",
         "description": "Send one raw request body. ZIP files must contain index.html at their root. Build source projects before calling this endpoint. Returns only after atomic publication.",
-        "parameters": [{
-          "name": "spa",
-          "in": "query",
-          "required": false,
-          "description": "Set to 1 to serve index.html for paths that do not match a real file.",
-          "schema": {"type": "string", "enum": ["0", "1"], "default": "0"}
-        }],
+        "parameters": [
+          {
+            "name": "spa",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 to serve index.html for paths that do not match a real file.",
+            "schema": {"type": "string", "enum": ["0", "1"], "default": "0"}
+          },
+          {
+            "name": "ttl",
+            "in": "query",
+            "required": false,
+            "description": "Optional deployment lifetime as a Go-style duration such as 72h or 90m. Defaults to 720h when omitted.",
+            "schema": {"type": "string", "examples": ["72h", "90m", "168h"]}
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "text/html": {"schema": {"type": "string", "contentMediaType": "text/html"}},
             "text/markdown": {"schema": {"type": "string", "contentMediaType": "text/markdown"}},
-            "application/zip": {"schema": {"type": "string", "contentEncoding": "base64", "contentMediaType": "application/zip"}}
+            "application/zip": {"schema": {"type": "string", "format": "binary", "contentMediaType": "application/zip"}}
           }
         },
         "responses": {
           "201": {
             "description": "Published",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-07-19T14:30:00Z","files":37,"bytes":1842032,"spa":true}}}
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-06-22T14:30:00Z","files":37,"bytes":1842032,"spa":true}}}
           },
           "400": {"$ref": "#/components/responses/ClientError"},
           "413": {"$ref": "#/components/responses/ClientError"},
@@ -56,14 +65,14 @@
           {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
           {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."}
         ],
-        "responses": {"200":{"description":"Published static content"},"404":{"description":"Deployment or file not found"},"410":{"description":"Deployment expired"}}
+        "responses": {"200":{"description":"Published static content"},"404":{"description":"Deployment not found, expired, or missing the requested file"}}
       }
     }
   },
   "components": {
     "schemas": {
-      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"Exactly 720 hours after createdAt."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"}}},
-      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["unsupported_media_type","upload_too_large","too_many_files","invalid_archive","missing_index","rate_limited","insufficient_storage","service_unavailable"]},"message":{"type":"string"},"details":{"type":"object","additionalProperties":true},"docsUrl":{"type":"string","format":"uri"}}}}}
+      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"CreatedAt plus the requested ttl, or 720 hours when ttl is omitted."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"}}},
+      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["empty_body","invalid_archive","invalid_spa","invalid_ttl","internal_error","method_not_allowed","missing_index","rate_limited","service_unavailable","too_many_files","unsupported_media_type","upload_too_large"]},"message":{"type":"string"}}}}}
     },
     "responses": {
       "ClientError": {"description":"The upload was rejected", "content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},

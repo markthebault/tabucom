@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"here-now-alternative/internal/server"
+	"github.com/markthebault/tabucom/internal/server"
 )
 
 func main() {

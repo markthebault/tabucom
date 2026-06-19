@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          fmt_out="$(gofmt -l ./cmd ./internal)"
+          test -z "$fmt_out" || {
+            echo "$fmt_out"
+            exit 1
+          }
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Validate embedded JSON
+        run: |
+          python3 -m json.tool internal/server/web/openapi.json >/dev/null
+          python3 -m json.tool internal/server/web/.well-known/agent.json >/dev/null
+
+      - name: Build binary
+        run: go build ./cmd/tabucom

@@ -1,10 +1,10 @@
 # Agent guide
 
-This repository implements an internal, no-sign-in temporary static publisher. Preserve these invariants:
+This repository implements Tabucom, an internal, no-sign-in temporary static hosting service. Preserve these invariants:
 
 - `POST /api/v1/publish` accepts raw HTML, Markdown, or a ZIP of already-built static files.
 - The server never executes uploaded code or runs package-manager/build commands.
-- Every deployment is immutable and expires exactly 30 days after successful publication.
+- Every deployment is immutable and expires at the client-requested TTL, or after the default 30-day retention window when omitted.
 - ZIPs require `index.html` at their root and must be extracted defensively.
 - Path mode serves `/p/{id}/`; optional wildcard mode returns a deployment subdomain.
 - Agents must return both `url` and `expiresAt` after publishing.
@@ -14,7 +14,7 @@ This repository implements an internal, no-sign-in temporary static publisher. P
 Run the service:
 
 ```sh
-go run ./cmd/here-now-alt
+go run ./cmd/tabucom
 ```
 
 Format, test, and statically check changes:
@@ -28,12 +28,12 @@ go vet ./...
 Build and smoke-test the container:
 
 ```sh
-docker build -t temporary-publisher .
-docker run --rm -d --name temporary-publisher-test -p 8080:8080 \
+docker build -t tabucom .
+docker run --rm -d --name tabucom-test -p 8080:8080 \
   -e PUBLIC_API_URL=http://localhost:8080 \
-  -v publisher-test-data:/data temporary-publisher
+  -v tabucom-test-data:/data tabucom
 curl -fsS http://localhost:8080/healthz
-docker stop temporary-publisher-test
+docker stop tabucom-test
 ```
 
 Smoke-test all input forms against a running server:

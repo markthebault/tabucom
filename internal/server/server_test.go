@@ -35,15 +35,23 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
 	t.Setenv("PUBLIC_API_URL", "https://publish.example.test/")
 	t.Setenv("PREVIEW_DOMAIN", "Preview.Example.Test.")
-	t.Setenv("TTL", "24h")
+	t.Setenv("TTL", "720h")
 	t.Setenv("MAX_FILES", "25")
 	t.Setenv("RATE_LIMIT_PER_HOUR", "7")
 	cfg, err := ConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ListenAddr != ":18080" || cfg.BaseURL != "https://publish.example.test" || cfg.PreviewDomain != "preview.example.test" || cfg.TTL != 24*time.Hour || cfg.MaxFiles != 25 || cfg.RateLimitPerHour != 7 {
+	if cfg.ListenAddr != ":18080" || cfg.BaseURL != "https://publish.example.test" || cfg.PreviewDomain != "preview.example.test" || cfg.TTL != deploymentTTL || cfg.MaxFiles != 25 || cfg.RateLimitPerHour != 7 {
 		t.Fatalf("unexpected config: %+v", cfg)
+	}
+	t.Setenv("TTL", "24h")
+	cfg, err = ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TTL != 24*time.Hour {
+		t.Fatalf("expected overridden TTL, got %s", cfg.TTL)
 	}
 	t.Setenv("PORT", "invalid")
 	if _, err := ConfigFromEnv(); err == nil {
@@ -68,7 +76,7 @@ func publish(t *testing.T, s *Server, contentType string, body []byte, query str
 
 func TestPublishHTMLAndServe(t *testing.T) {
 	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
-	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now }; c.TTL = 2 * time.Hour })
+	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now } })
 	got, w := publish(t, s, "text/html; charset=utf-8", []byte("<h1>Hello</h1>"), "?spa=1")
 	if w.Code != 201 {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
@@ -76,7 +84,7 @@ func TestPublishHTMLAndServe(t *testing.T) {
 	if !validID(got.ID) || got.URL != "http://publisher.test/p/"+got.ID+"/" || got.Files != 1 || !got.SPA {
 		t.Fatalf("bad response: %+v", got)
 	}
-	if !got.CreatedAt.Equal(now) || !got.ExpiresAt.Equal(now.Add(2*time.Hour)) {
+	if !got.CreatedAt.Equal(now) || !got.ExpiresAt.Equal(now.Add(deploymentTTL)) {
 		t.Fatalf("bad timestamps: %+v", got)
 	}
 	r := httptest.NewRequest(http.MethodGet, "http://publisher.test/p/"+got.ID+"/", nil)
@@ -94,6 +102,18 @@ func TestPublishHTMLAndServe(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(s.sites, got.ID, metadataName)); err != nil {
 		t.Fatal("metadata missing:", err)
+	}
+}
+
+func TestPublishCustomTTL(t *testing.T) {
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now } })
+	got, w := publish(t, s, "text/html; charset=utf-8", []byte("<h1>Hello</h1>"), "?ttl=48h")
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !got.ExpiresAt.Equal(now.Add(48 * time.Hour)) {
+		t.Fatalf("bad custom expiry: %+v", got)
 	}
 }
 
@@ -197,7 +217,9 @@ func TestZIPRejections(t *testing.T) {
 		{"backslash traversal", []zipEntry{{"..\\index.html", "x", 0}}, "invalid_archive"},
 		{"duplicate normalized", []zipEntry{{"index.html", "x", 0}, {"a/../index.html", "y", 0}}, "invalid_archive"},
 		{"symlink", []zipEntry{{"index.html", "target", os.ModeSymlink | 0777}}, "invalid_archive"},
+		{"conflicting paths", []zipEntry{{"index.html", "x", 0}, {"assets", "file", 0}, {"assets/app.js", "x", 0}}, "invalid_archive"},
 		{"missing index", []zipEntry{{"dist/index.html", "x", 0}}, "missing_index"},
+		{"index is a directory", []zipEntry{{"index.html/", "", os.ModeDir}}, "missing_index"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,16 +263,22 @@ func TestZIPLimitsAndUploadLimit(t *testing.T) {
 	if len(entries) != 0 {
 		t.Fatalf("failed upload left visible or staged content: %v", entries)
 	}
+
+	s3 := testServer(t, func(c *Config) { c.MaxFiles = 2; c.MaxUploadBytes = 2048 })
+	_, w = publish(t, s3, "application/zip", zipBody(t, zipEntry{"assets/", "", os.ModeDir}, zipEntry{"index.html", "x", 0}, zipEntry{"assets/app.js", "ok", 0}), "")
+	if w.Code != 413 || !strings.Contains(w.Body.String(), "too_many_files") {
+		t.Fatalf("entry limit status=%d %s", w.Code, w.Body.String())
+	}
 }
 
 func TestExpirySweep(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now }; c.TTL = time.Hour })
+	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now } })
 	got, w := publish(t, s, "text/html", []byte("x"), "")
 	if w.Code != 201 {
 		t.Fatal(w.Body.String())
 	}
-	now = now.Add(2 * time.Hour)
+	now = got.ExpiresAt.Add(time.Second)
 	if err := s.Sweep(); err != nil {
 		t.Fatal(err)
 	}
@@ -265,6 +293,33 @@ func TestExpirySweep(t *testing.T) {
 	}
 }
 
+func TestServeCacheControlHonorsRemainingTTL(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	s := testServer(t, func(c *Config) { c.Now = func() time.Time { return now } })
+	got, w := publish(t, s, "text/html", []byte("x"), "")
+	if w.Code != http.StatusCreated {
+		t.Fatal(w.Body.String())
+	}
+
+	now = got.ExpiresAt.Add(-500 * time.Millisecond)
+	r := httptest.NewRequest(http.MethodGet, "http://x/p/"+got.ID+"/", nil)
+	out := httptest.NewRecorder()
+	s.ServeHTTP(out, r)
+	if out.Code != http.StatusOK {
+		t.Fatalf("near-expiry serve status=%d", out.Code)
+	}
+	if out.Header().Get("Cache-Control") != "public, max-age=0, must-revalidate" {
+		t.Fatalf("unexpected cache control: %q", out.Header().Get("Cache-Control"))
+	}
+
+	now = got.ExpiresAt
+	out = httptest.NewRecorder()
+	s.ServeHTTP(out, r)
+	if out.Code != http.StatusNotFound {
+		t.Fatalf("exact-expiry serve status=%d", out.Code)
+	}
+}
+
 func TestAPIValidationHealthAndDocs(t *testing.T) {
 	s := testServer(t, nil)
 	for _, tc := range []struct {
@@ -272,7 +327,7 @@ func TestAPIValidationHealthAndDocs(t *testing.T) {
 		body   []byte
 		status int
 		code   string
-	}{{"application/json", "", []byte("{}"), 415, "unsupported_media_type"}, {"text/html", "?spa=maybe", []byte("x"), 400, "invalid_spa"}, {"text/html", "", nil, 400, "empty_body"}} {
+	}{{"application/json", "", []byte("{}"), 415, "unsupported_media_type"}, {"text/html", "?spa=maybe", []byte("x"), 400, "invalid_spa"}, {"text/html", "?ttl=0", []byte("x"), 400, "invalid_ttl"}, {"text/html", "", nil, 400, "empty_body"}} {
 		_, w := publish(t, s, tc.ct, tc.body, tc.q)
 		if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.code) {
 			t.Fatalf("got %d %s", w.Code, w.Body.String())
@@ -292,7 +347,7 @@ func TestAPIValidationHealthAndDocs(t *testing.T) {
 			t.Errorf("health response does not verify storage: %s", w.Body.String())
 		}
 		if url == "http://docs.test/" {
-			for _, required := range []string{"POST", "HTML", "Markdown", "ZIP", "30 days", "Static builds only", "http://docs.test/api/v1/publish"} {
+			for _, required := range []string{"POST", "HTML", "Markdown", "ZIP", "ttl", "30 days", "Static builds only", "http://docs.test/api/v1/publish"} {
 				if !strings.Contains(w.Body.String(), required) {
 					t.Errorf("homepage is missing agent-critical text %q", required)
 				}

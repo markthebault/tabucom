@@ -1,5 +1,5 @@
 services:
-  publisher:
+  tabucom:
     build: .
     restart: unless-stopped
     ports:
@@ -7,12 +7,11 @@ services:
     environment:
       PORT: "8080"
       DATA_DIR: /data
-      TTL: "${TTL:-720h}"
       PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:8080}"
       MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-104857600}"
       MAX_EXPANDED_BYTES: "${MAX_EXPANDED_BYTES:-524288000}"
     volumes:
-      - publisher-data:/data
+      - tabucom-data:/data
 
 volumes:
-  publisher-data:
+  tabucom-data:
