@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Proposal and implementation plan for an internal, agent-friendly temporary static hosting service inspired by here.now.">
+  <title>Internal Temporary Hosting — Proposal &amp; Implementation Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #13211d;
+      --muted: #596861;
+      --paper: #f4f1e8;
+      --surface: #fffdf7;
+      --line: #d9d6cc;
+      --green: #0d5c45;
+      --green-soft: #dcebe4;
+      --amber: #bd5b18;
+      --amber-soft: #fae6d6;
+      --blue: #2e5b86;
+      --blue-soft: #e3edf7;
+      --code: #17221f;
+      --code-ink: #e8f3ee;
+      --shadow: 0 16px 50px rgba(31, 40, 36, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+
+    a { color: var(--green); text-underline-offset: 3px; }
+    a:hover { color: var(--amber); }
+
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      padding: 0.12rem 0.35rem;
+      border-radius: 5px;
+      background: rgba(13, 92, 69, 0.09);
+      font-size: 0.91em;
+    }
+
+    pre {
+      margin: 1rem 0 0;
+      overflow-x: auto;
+      padding: 1rem 1.1rem;
+      border-radius: 12px;
+      background: var(--code);
+      color: var(--code-ink);
+      font-size: 0.84rem;
+      line-height: 1.55;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+
+    pre code { padding: 0; background: transparent; color: inherit; }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 78px 0 64px;
+      background:
+        radial-gradient(circle at 90% 12%, rgba(250, 230, 214, 0.9), transparent 28%),
+        radial-gradient(circle at 8% 90%, rgba(220, 235, 228, 0.95), transparent 32%),
+        var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 16px;
+      color: var(--green);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      line-height: 1.14;
+      letter-spacing: -0.025em;
+    }
+
+    h1 {
+      max-width: 900px;
+      margin-bottom: 22px;
+      font-size: clamp(2.6rem, 6vw, 5.25rem);
+      font-weight: 760;
+    }
+
+    h2 { margin-bottom: 18px; font-size: clamp(1.75rem, 3vw, 2.55rem); }
+    h3 { margin-bottom: 10px; font-size: 1.12rem; }
+
+    .lede {
+      max-width: 820px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(1.08rem, 2vw, 1.34rem);
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 32px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 6px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.7);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 650;
+    }
+
+    .nav-wrap {
+      position: sticky;
+      z-index: 10;
+      top: 0;
+      background: rgba(244, 241, 232, 0.93);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 0;
+      scrollbar-width: thin;
+    }
+
+    .nav a {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .nav a:hover { background: var(--green-soft); color: var(--green); }
+
+    main { padding: 54px 0 90px; }
+
+    section { scroll-margin-top: 72px; margin-bottom: 66px; }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(250px, 420px);
+      gap: 32px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+
+    .section-head p { margin: 0; color: var(--muted); }
+
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card p { color: var(--muted); }
+
+    .number {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      margin-bottom: 18px;
+      border-radius: 9px;
+      background: var(--green);
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    .callout {
+      padding: 20px 22px;
+      border-left: 5px solid var(--amber);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: var(--amber-soft);
+    }
+
+    .callout strong { color: #7e350d; }
+    .callout p { margin: 0; }
+
+    .decision {
+      border-color: #b8d1c6;
+      background: linear-gradient(145deg, #fafffc, var(--green-soft));
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .tag.warn { background: var(--amber-soft); color: #7e350d; }
+    .tag.info { background: var(--blue-soft); color: var(--blue); }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      font-size: 0.91rem;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #e9e5da; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+
+    ul, ol { padding-left: 1.25rem; }
+    li + li { margin-top: 0.5rem; }
+
+    .architecture {
+      display: grid;
+      grid-template-columns: 1fr auto 1.1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .arch-node {
+      min-height: 132px;
+      padding: 18px;
+      border: 1px solid #bfd0c8;
+      border-radius: 14px;
+      background: #f7fcf9;
+    }
+
+    .arch-node.core { border-color: #e2b28f; background: #fff7ef; }
+    .arch-node.data { border-color: #b7c9db; background: #f3f8fd; }
+    .arch-node p { margin: 7px 0 0; color: var(--muted); font-size: 0.86rem; }
+    .arrow { color: var(--green); font-size: 1.55rem; font-weight: 900; }
+
+    .api-method {
+      display: inline-block;
+      min-width: 48px;
+      margin-right: 8px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: var(--green);
+      color: white;
+      font-size: 0.73rem;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .timeline { counter-reset: phase; }
+
+    .phase {
+      position: relative;
+      padding: 0 0 30px 64px;
+      border-left: 2px solid #cbd5d0;
+    }
+
+    .phase:last-child { padding-bottom: 0; border-left-color: transparent; }
+
+    .phase::before {
+      counter-increment: phase;
+      content: counter(phase);
+      position: absolute;
+      left: -20px;
+      top: -4px;
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--green);
+      color: white;
+      font-size: 0.82rem;
+      font-weight: 850;
+    }
+
+    .phase p { margin: 4px 0 0; color: var(--muted); }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 18px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      position: relative;
+      margin: 0;
+      padding: 12px 12px 12px 42px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--surface);
+    }
+
+    .checklist li::before {
+      content: "✓";
+      position: absolute;
+      left: 14px;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .source-list { font-size: 0.92rem; }
+    .source-list li { color: var(--muted); }
+
+    .footer {
+      padding: 28px 0 42px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    @media (max-width: 860px) {
+      .section-head, .grid.two, .grid.three, .checklist { grid-template-columns: 1fr; }
+      .section-head { gap: 8px; }
+      .architecture { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); justify-self: center; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 22px, 1180px); }
+      .hero { padding: 56px 0 48px; }
+      main { padding-top: 36px; }
+      .card { padding: 18px; }
+      th, td { padding: 11px 10px; }
+      .table-scroll { overflow-x: auto; }
+      table { min-width: 680px; }
+      .phase { padding-left: 44px; }
+    }
+
+    @media print {
+      .nav-wrap { display: none; }
+      body { background: white; }
+      .hero { padding: 34px 0; }
+      .card, .architecture { box-shadow: none; break-inside: avoid; }
+      section { margin-bottom: 34px; break-inside: auto; }
+      a { color: inherit; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="shell">
+      <p class="eyebrow">Proposal · analysis first · no implementation</p>
+      <h1>Internal temporary hosting for agents</h1>
+      <p class="lede">A deliberately small, single-container service that accepts HTML, Markdown, or a ZIP of prebuilt static files, returns a private-company URL immediately, and deletes the deployment after 30 days.</p>
+      <div class="hero-meta" aria-label="Proposal summary">
+        <span class="pill">One POST request</span>
+        <span class="pill">No account or sign-in</span>
+        <span class="pill">30-day fixed expiry</span>
+        <span class="pill">Static output only</span>
+        <span class="pill">Single Docker container</span>
+        <span class="pill">Prepared 19 June 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="nav-wrap">
+    <nav class="nav shell" aria-label="Plan sections">
+      <a href="#recommendation">Recommendation</a>
+      <a href="#analysis">here.now analysis</a>
+      <a href="#scope">Scope</a>
+      <a href="#workflow">Agent workflow</a>
+      <a href="#api">API</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#security">Security</a>
+      <a href="#delivery">Delivery plan</a>
+      <a href="#acceptance">Acceptance</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </div>
+
+  <main class="shell">
+    <section id="recommendation">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Executive recommendation</p>
+          <h2>Build the static-hosting core, not the hosting platform</h2>
+        </div>
+        <p>here.now has accounts, object storage, versions, access control, custom domains, analytics, and drives. None of that is needed for the first internal version.</p>
+      </div>
+
+      <div class="grid three">
+        <article class="card decision">
+          <span class="tag">Build</span>
+          <h3>One immutable deployment endpoint</h3>
+          <p>Each publish creates a new random ID and URL. There is no update, delete, list, account, or ownership workflow in the MVP. Expiry is always 30 days.</p>
+        </article>
+        <article class="card decision">
+          <span class="tag">Accept</span>
+          <h3>HTML, Markdown, and ZIP</h3>
+          <p>Single-file input is convenient for agents. ZIP is the canonical format for a complete Vite, React, Vue, Svelte, or other static build output.</p>
+        </article>
+        <article class="card decision">
+          <span class="tag">Run</span>
+          <h3>One Go binary and one data volume</h3>
+          <p>The container receives uploads, renders Markdown, serves static files, stores metadata, and runs the expiry sweep. An existing company ingress handles TLS.</p>
+        </article>
+      </div>
+
+      <div class="callout" style="margin-top: 18px">
+        <p><strong>Important boundary:</strong> accept the result of <code>npm run build</code>—for example <code>dist/</code> or <code>build/</code>. Do not accept a Node.js source project and run <code>npm install</code> or build commands inside the hosting service. Executing uploaded projects turns a simple static host into a remote-code-execution platform.</p>
+      </div>
+    </section>
+
+    <section id="analysis">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Reference analysis</p>
+          <h2>What here.now actually does</h2>
+        </div>
+        <p>These are externally observed product and API behaviors, not claims about its private implementation.</p>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Capability</th><th>Observed here.now behavior</th><th>Proposed internal equivalent</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Agent entry point</td>
+              <td>A simple landing page, current documentation, installable agent skill, OpenAPI, and well-known discovery files.</td>
+              <td>A compact documentation page with copyable curl commands, <code>/openapi.json</code>, <code>/llms.txt</code>, and <code>/.well-known/agent.json</code>.</td>
+            </tr>
+            <tr>
+              <td>Publishing</td>
+              <td>Three steps: submit a file manifest, upload each file to a presigned URL, then finalize the version.</td>
+              <td>One streaming POST containing HTML, Markdown, or ZIP. Local storage removes the need for presigned uploads and finalization.</td>
+            </tr>
+            <tr>
+              <td>Directories</td>
+              <td>The public helper recursively enumerates a directory, calculates SHA-256 hashes and content types, uploads files, then finalizes.</td>
+              <td>The agent ZIPs the build directory; the server validates and extracts it atomically.</td>
+            </tr>
+            <tr>
+              <td>URLs</td>
+              <td>Each site receives a random subdomain. This preserves root-relative paths and gives each deployment its own browser origin.</td>
+              <td>Prefer <code>https://&lt;id&gt;.preview.tools.company/</code>. A path URL is supported only with documented build-base limitations.</td>
+            </tr>
+            <tr>
+              <td>Routing</td>
+              <td>Optional SPA mode serves <code>index.html</code> for unknown paths while real assets continue to resolve normally.</td>
+              <td>A <code>?spa=1</code> publish option records the same fallback behavior.</td>
+            </tr>
+            <tr>
+              <td>Expiry</td>
+              <td>Anonymous sites currently expire after 24 hours; account-backed sites can persist or use a custom TTL.</td>
+              <td>All deployments expire after exactly 30 days. No claim or account flow.</td>
+            </tr>
+            <tr>
+              <td>Storage model</td>
+              <td>Public documentation says content is served from Cloudflare's global network.</td>
+              <td>A mounted local volume. Object storage can be added later without changing the upload contract.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="scope">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">MVP contract</p>
+          <h2>What the service will and will not host</h2>
+        </div>
+        <p>The narrow scope is intentional. It makes the service predictable for agents and safe enough for internal deployment.</p>
+      </div>
+
+      <div class="grid two">
+        <article class="card">
+          <span class="tag">Included</span>
+          <h3>Supported input</h3>
+          <ul>
+            <li><strong>HTML:</strong> a single document becomes <code>index.html</code>.</li>
+            <li><strong>Markdown:</strong> rendered server-side into a standard, self-contained HTML shell.</li>
+            <li><strong>ZIP:</strong> a full prebuilt static site with HTML, CSS, JavaScript, images, fonts, JSON, WASM, media, and source maps.</li>
+            <li><strong>SPA fallback:</strong> optional for client-side routers.</li>
+            <li><strong>Immutable URL:</strong> every POST creates a new deployment.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <span class="tag warn">Excluded from MVP</span>
+          <h3>Unsupported workloads</h3>
+          <ul>
+            <li>Running Node.js, Python, PHP, SSR, server actions, or background workers.</li>
+            <li>Building source projects on the server.</li>
+            <li>Databases, writable application storage, secrets, or environment variables.</li>
+            <li>Accounts, dashboards, ownership, updates, custom TTLs, or manual deletion.</li>
+            <li>Directory browsing when a ZIP has no root <code>index.html</code>; reject it with a useful error instead.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Agent experience</p>
+          <h2>Build locally, publish once, return the URL</h2>
+        </div>
+        <p>The landing page should put these examples first so an agent can discover the contract without an SDK.</p>
+      </div>
+
+      <div class="grid three">
+        <article class="card">
+          <span class="number">01</span>
+          <h3>Single HTML page</h3>
+          <pre><code>curl -sS -X POST \
+  "https://publish.tools.company/api/v1/publish" \
+  -H "Content-Type: text/html; charset=utf-8" \
+  --data-binary @index.html</code></pre>
+        </article>
+        <article class="card">
+          <span class="number">02</span>
+          <h3>Markdown document</h3>
+          <pre><code>curl -sS -X POST \
+  "https://publish.tools.company/api/v1/publish" \
+  -H "Content-Type: text/markdown; charset=utf-8" \
+  --data-binary @report.md</code></pre>
+        </article>
+        <article class="card">
+          <span class="number">03</span>
+          <h3>Complete front-end build</h3>
+          <pre><code>npm run build
+(cd dist &amp;&amp; zip -qr ../site.zip .)
+
+curl -sS -X POST \
+  "https://publish.tools.company/api/v1/publish?spa=1" \
+  -H "Content-Type: application/zip" \
+  --data-binary @site.zip</code></pre>
+        </article>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
+        <span class="tag info">Response</span>
+        <pre><code>HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "id": "019f2a56-7f0d-73c3-89ef-8f0d8c499f26",
+  "url": "https://019f2a56-7f0d-73c3-89ef-8f0d8c499f26.preview.tools.company/",
+  "createdAt": "2026-06-19T14:30:00Z",
+  "expiresAt": "2026-07-19T14:30:00Z",
+  "files": 37,
+  "bytes": 1842032,
+  "spa": true
+}</code></pre>
+        <p>The agent's final action is to present <code>url</code> and state the expiration date. UUIDv7 is a good default: high entropy, sortable by creation time, and supported without a central sequence.</p>
+      </div>
+    </section>
+
+    <section id="api">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Minimal HTTP interface</p>
+          <h2>Four public routes are enough</h2>
+        </div>
+        <p>Keep the application contract small and describe every error in machine-readable JSON.</p>
+      </div>
+
+      <div class="grid two">
+        <article class="card">
+          <h3><span class="api-method">POST</span><code>/api/v1/publish</code></h3>
+          <p>Streams the request body to a temporary area. The <code>Content-Type</code> selects HTML, Markdown, or ZIP. Optional query: <code>spa=1</code>. Returns <code>201</code> only after the deployment is fully validated and atomically made live.</p>
+        </article>
+        <article class="card">
+          <h3><span class="api-method">GET</span><code>/</code></h3>
+          <p>Human- and agent-readable documentation with exact examples, limits, expiration behavior, supported file types, and the static-only boundary.</p>
+        </article>
+        <article class="card">
+          <h3><span class="api-method">GET</span><code>/openapi.json</code></h3>
+          <p>OpenAPI 3.1 specification. Also expose <code>/llms.txt</code> and <code>/.well-known/agent.json</code> so agents can discover the service without scraping.</p>
+        </article>
+        <article class="card">
+          <h3><span class="api-method">GET</span><code>/healthz</code></h3>
+          <p>Returns health, writable-volume status, free disk threshold, and cleanup-loop freshness. Do not expose deployment listings or filesystem paths.</p>
+        </article>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
+        <h3>Error shape</h3>
+        <pre><code>{
+  "error": {
+    "code": "invalid_archive",
+    "message": "ZIP must contain index.html at its root",
+    "details": { "detectedRoot": "my-app/dist/" },
+    "docsUrl": "https://publish.tools.company/#zip-layout"
+  }
+}</code></pre>
+        <p>Use stable codes such as <code>unsupported_media_type</code>, <code>upload_too_large</code>, <code>too_many_files</code>, <code>invalid_archive</code>, <code>missing_index</code>, <code>rate_limited</code>, <code>insufficient_storage</code>, and <code>service_unavailable</code>.</p>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Single-container architecture</p>
+          <h2>One process, one persistent volume</h2>
+        </div>
+        <p>The company ingress and DNS are existing infrastructure, not additional application containers.</p>
+      </div>
+
+      <div class="architecture" role="img" aria-label="Agent sends an upload through company ingress to one hosting process, which stores content and metadata on a persistent volume">
+        <div class="arch-node">
+          <strong>Agent or CI</strong>
+          <p>Builds the front end, packages output, sends one HTTP POST, receives JSON.</p>
+        </div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="arch-node core">
+          <strong>Company ingress + one Go process</strong>
+          <p>TLS, request limits, upload validation, Markdown rendering, static serving, SPA fallback, health checks, and expiry sweep.</p>
+        </div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="arch-node data">
+          <strong>Mounted <code>/data</code> volume</strong>
+          <p><code>sites/&lt;id&gt;/content</code>, a small metadata file, temporary uploads, and cleanup state.</p>
+        </div>
+      </div>
+
+      <div class="grid two" style="margin-top: 16px">
+        <article class="card">
+          <span class="tag">Recommended stack</span>
+          <h3>Go static binary</h3>
+          <ul>
+            <li>Standard <code>net/http</code> server and <code>archive/zip</code>.</li>
+            <li><code>goldmark</code> for Markdown.</li>
+            <li>Filesystem metadata per deployment; no database for the MVP.</li>
+            <li>Periodic directory scan is adequate for thousands of temporary sites.</li>
+            <li>Run as a non-root user in a minimal image.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <span class="tag">Runtime settings</span>
+          <h3>Container contract</h3>
+          <ul>
+            <li><code>PORT=8080</code></li>
+            <li><code>DATA_DIR=/data</code></li>
+            <li><code>TTL=720h</code></li>
+            <li><code>PUBLIC_API_URL=https://publish.tools.company</code></li>
+            <li><code>PREVIEW_DOMAIN=preview.tools.company</code></li>
+            <li><code>MAX_UPLOAD_BYTES=104857600</code></li>
+            <li><code>MAX_EXPANDED_BYTES=524288000</code></li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
+        <h3>Atomic publish lifecycle</h3>
+        <ol>
+          <li>Allocate UUIDv7 and stream the body into <code>/data/tmp/&lt;id&gt;</code>; never buffer an entire archive in memory.</li>
+          <li>Validate content type, compressed size, expanded size, path safety, file count, and required entry point.</li>
+          <li>Render Markdown or extract ZIP into a staging content directory.</li>
+          <li>Write immutable metadata with <code>createdAt</code>, <code>expiresAt</code>, byte count, file count, and SPA mode.</li>
+          <li>Atomically rename staging to <code>/data/sites/&lt;id&gt;</code>. Only then return <code>201</code>.</li>
+          <li>Sweep expired sites hourly and once at startup. Delete content and metadata idempotently; log the site ID, age, and bytes reclaimed.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="security">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Security and operational limits</p>
+          <h2>No login does not mean no boundary</h2>
+        </div>
+        <p>The service accepts active HTML and JavaScript. Treat every published site as untrusted, even on a company network.</p>
+      </div>
+
+      <div class="callout">
+        <p><strong>Use a separate preview origin.</strong> Put documentation and publishing at <code>publish.tools.company</code>, and uploaded content at <code>&lt;id&gt;.preview.tools.company</code>. Both can reach the same container. This prevents an uploaded script from sharing cookies, local storage, or service-worker scope with the publishing interface.</p>
+      </div>
+
+      <div class="grid three" style="margin-top: 16px">
+        <article class="card">
+          <span class="tag warn">Archive safety</span>
+          <h3>Reject dangerous ZIPs</h3>
+          <p>Reject absolute paths, <code>..</code> traversal, NUL bytes, symlinks, devices, duplicate normalized paths, excessive nesting, more than 10,000 files, and expansion beyond 500 MB.</p>
+        </article>
+        <article class="card">
+          <span class="tag warn">Resource safety</span>
+          <h3>Bound anonymous writes</h3>
+          <p>Default to 100 MB uploaded, 500 MB expanded, 60 publishes/hour/IP, request timeouts, concurrent-upload limits, and a minimum free-disk threshold.</p>
+        </article>
+        <article class="card">
+          <span class="tag warn">Network safety</span>
+          <h3>Keep it internal</h3>
+          <p>Allow the publish host only from the corporate network or VPN at the ingress. If it ever becomes internet-facing, add at least a shared bearer token before launch.</p>
+        </article>
+      </div>
+
+      <div class="grid two" style="margin-top: 16px">
+        <article class="card">
+          <h3>Serving headers</h3>
+          <ul>
+            <li><code>X-Content-Type-Options: nosniff</code></li>
+            <li><code>Referrer-Policy: no-referrer</code></li>
+            <li><code>Permissions-Policy</code> disabling camera, microphone, geolocation, and payment by default.</li>
+            <li><code>Cache-Control: public, max-age=31536000, immutable</code> for versioned assets; shorter caching for HTML.</li>
+            <li>No cookies and no credentialed CORS on the preview domain; no CORS permission on the publish endpoint.</li>
+            <li>Route by host: the publish host never serves uploaded files, and preview hosts never expose <code>/api</code> or documentation routes.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Why a path URL is a compromise</h3>
+          <p>A path such as <code>preview.tools.company/&lt;uuid&gt;/</code> is operationally easy, but front ends built with root-relative URLs such as <code>/assets/app.js</code> will request the wrong location. Client routers and <code>fetch('/api')</code> have the same problem.</p>
+          <p>If wildcard DNS/TLS is unavailable, path mode should require builds configured for a relative or explicit base path. HTML rewriting alone cannot reliably fix runtime-generated URLs.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="delivery">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Implementation sequence</p>
+          <h2>Four small phases</h2>
+        </div>
+        <p>A production-ready internal MVP is roughly 3–5 engineering days once DNS, ingress, and volume choices are known.</p>
+      </div>
+
+      <div class="timeline">
+        <article class="phase">
+          <h3>Lock deployment assumptions · half day</h3>
+          <p>Choose wildcard subdomains versus path mode, the persistent-volume location, maximum bundle size, and the corporate network policy. Confirm that TLS terminates at the existing ingress.</p>
+        </article>
+        <article class="phase">
+          <h3>Build the vertical slice · 1–2 days</h3>
+          <p>Implement the Go server, all three request content types, Markdown shell, safe ZIP extraction, atomic publication, static serving, SPA fallback, JSON errors, and the 30-day metadata contract.</p>
+        </article>
+        <article class="phase">
+          <h3>Harden and operate · 1–2 days</h3>
+          <p>Add rate and concurrency limits, disk-watermark handling, expiry sweeps, startup recovery, structured logs, metrics, non-root Docker packaging, health checks, and malicious-archive tests.</p>
+        </article>
+        <article class="phase">
+          <h3>Make it obvious to agents · half to one day</h3>
+          <p>Ship the documentation landing page, OpenAPI file, discovery documents, exact curl recipes, and an optional 30-line <code>publish.sh</code> helper that ZIPs a directory and prints only the resulting URL.</p>
+        </article>
+      </div>
+
+      <div class="card" style="margin-top: 26px">
+        <span class="tag info">Later, only if needed</span>
+        <p>Update/delete capability tokens, selectable TTLs, manual expiry extension, an internal deployment list, object-storage backends, custom domains, password protection, analytics, and per-team quotas. These should not delay the initial static-publish workflow.</p>
+      </div>
+    </section>
+
+    <section id="acceptance">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Definition of done</p>
+          <h2>Acceptance criteria</h2>
+        </div>
+        <p>Tests should exercise the published result through its real URL, not only the upload response.</p>
+      </div>
+
+      <ul class="checklist">
+        <li>A raw HTML upload returns a URL and renders exactly that document.</li>
+        <li>A Markdown upload renders headings, tables, lists, code blocks, and links safely.</li>
+        <li>A zipped Vite build loads JavaScript, CSS, fonts, images, and dynamic chunks.</li>
+        <li>SPA mode reloads a nested route and returns <code>index.html</code>.</li>
+        <li>A non-SPA unknown path returns <code>404</code>.</li>
+        <li>Content survives a container restart when the same volume is mounted.</li>
+        <li>A shortened test TTL removes content and changes its URL to <code>404</code> or <code>410</code>.</li>
+        <li>Path traversal, symlink, ZIP bomb, duplicate path, and over-limit archives are rejected.</li>
+        <li>Partial or disconnected uploads never create a visible deployment.</li>
+        <li>Low-disk mode rejects new uploads while existing sites remain readable.</li>
+        <li>The preview origin has no publishing cookies and cannot call credentialed control APIs.</li>
+        <li>An agent can discover and complete publishing using only the landing page or OpenAPI file.</li>
+      </ul>
+    </section>
+
+    <section id="decisions">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Decisions before coding</p>
+          <h2>Recommended defaults</h2>
+        </div>
+        <p>These choices are the only inputs that materially affect the implementation.</p>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Decision</th><th>Recommended default</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>Preview URL</td><td>Wildcard subdomain</td><td>Correct root-relative asset behavior and strong browser-origin isolation.</td></tr>
+            <tr><td>Application authentication</td><td>None</td><td>Matches the requested workflow; rely on corporate ingress/VPN access.</td></tr>
+            <tr><td>Persistence</td><td>One mounted filesystem volume</td><td>Lowest complexity for one container and temporary content.</td></tr>
+            <tr><td>Upload limit</td><td>100 MB compressed / 500 MB expanded</td><td>Enough for typical front-end builds while bounding abuse and ZIP bombs.</td></tr>
+            <tr><td>Expiry</td><td>Fixed 720 hours from successful publication</td><td>Simple contract with no ownership or update state.</td></tr>
+            <tr><td>Build execution</td><td>Never</td><td>Preserves the static-hosting security model.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sources">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Research sources</p>
+          <h2>Public behavior reviewed</h2>
+        </div>
+        <p>Reviewed on 19 June 2026. Product behavior can change; the proposal does not depend on undocumented internals.</p>
+      </div>
+
+      <div class="card">
+        <ol class="source-list">
+          <li><a href="https://here.now">here.now homepage</a> — agent positioning, anonymous publishing, URL model, expiry statement, and public FAQ.</li>
+          <li><a href="https://here.now/docs">here.now documentation</a> — create/upload/finalize flow, manifest shape, SPA routing, URL serving rules, limits, structured errors, OpenAPI, and agent discovery.</li>
+          <li><a href="https://github.com/heredotnow/skill/blob/main/here-now/SKILL.md">here.now agent skill</a> — agent trigger language, file-or-directory workflow, user handoff, and build-root guidance.</li>
+          <li><a href="https://github.com/heredotnow/skill/blob/main/here-now/scripts/publish.sh">here.now publish helper</a> — recursive directory enumeration, SHA-256 hashing, MIME detection, per-file upload, finalization, and SPA option.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">Internal temporary hosting proposal · planning artifact only · no service implementation included.</div>
+  </footer>
+</body>
+</html>
