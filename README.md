@@ -34,6 +34,26 @@ docker run --rm -p 8080:8080 \
   tabucom
 ```
 
+The Makefile defaults to `markthebault/tabucom:latest`. Build or push that image with:
+
+```sh
+make docker-build
+make docker-push
+```
+
+Override the repository or tag when needed:
+
+```sh
+make docker-push IMAGE_REPOSITORY=markthebault/tabucom IMAGE_TAG=v1.0.0
+```
+
+Pushes to `main` run the same build and push through GitHub Actions after tests pass. Configure these repository settings:
+
+- Variable `DOCKER_IMAGE_REPOSITORY` (defaults to `markthebault/tabucom`)
+- Variable `DOCKER_IMAGE_TAG` (defaults to `latest`)
+- Secret `DOCKERHUB_USERNAME`
+- Secret `DOCKERHUB_TOKEN` containing a Docker Hub access token with push access
+
 In production, terminate TLS at the company ingress and mount persistent storage at `/data`. Set `PUBLIC_API_URL` to the externally reachable publish origin so returned deployment URLs do not depend on proxy headers. Restrict the publish host to the corporate network or VPN. If wildcard DNS/TLS is configured, route both the publish host and `*.$PREVIEW_DOMAIN` to this container.
 
 ## Configuration
@@ -103,8 +123,7 @@ Uploaded HTML, CSS, and JavaScript run in the viewer's browser. In path mode, de
 ## Development
 
 ```sh
-go test ./...
-go vet ./...
+make check
 ```
 
 Run the black-box suite against a running server:
