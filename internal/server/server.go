@@ -216,7 +216,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
 		return
 	}
-	if (r.URL.Path == "/openapi.json" || r.URL.Path == "/llms.txt" || r.URL.Path == "/.well-known/agent.json") && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+	if (r.URL.Path == "/agents" || r.URL.Path == "/openapi.json" || r.URL.Path == "/llms.txt" || r.URL.Path == "/.well-known/agent.json") && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
 		s.serveWebFile(w, r)
 		return
 	}
@@ -272,12 +272,19 @@ func (s *Server) landing(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) serveWebFile(w http.ResponseWriter, r *http.Request) {
 	name := "web" + r.URL.Path
+	if r.URL.Path == "/agents" {
+		name = "web/agents.html"
+	}
 	b, err := fs.ReadFile(embeddedWeb, name)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	b = bytes.ReplaceAll(b, []byte("{{ORIGIN}}"), []byte(s.requestBase(r)))
+	origin := s.requestBase(r)
+	if path.Ext(name) == ".html" {
+		origin = html.EscapeString(origin)
+	}
+	b = bytes.ReplaceAll(b, []byte("{{ORIGIN}}"), []byte(origin))
 	if typ := mime.TypeByExtension(path.Ext(name)); typ != "" {
 		w.Header().Set("Content-Type", typ)
 	}

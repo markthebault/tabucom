@@ -28,7 +28,8 @@ assert_url() {
 
 curl -fsS "$BASE_URL/healthz" >/dev/null || fail "health endpoint is unavailable at $BASE_URL"
 pass health
-curl -fsS "$BASE_URL/" | grep -q '/api/v1/publish' || fail "homepage does not document the publish endpoint"
+curl -fsS "$BASE_URL/" | grep -q 'href="/agents"' || fail "homepage does not link to agent instructions"
+curl -fsS "$BASE_URL/agents" | grep -q '/api/v1/publish' || fail "agent guide does not document the publish endpoint"
 curl -fsS "$BASE_URL/openapi.json" | grep -q 'openapi' || fail "OpenAPI discovery document missing"
 curl -fsS "$BASE_URL/llms.txt" | grep -q '/api/v1/publish' || fail "llms.txt discovery document missing"
 curl -fsS "$BASE_URL/.well-known/agent.json" | grep -q 'publish' || fail "agent discovery document missing"

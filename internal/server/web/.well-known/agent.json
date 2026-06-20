@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "name": "Tabucom",
   "description": "Publishes HTML, Markdown, or prebuilt static-site ZIPs at immutable URLs with a client-selected TTL or a 30-day default.",
-  "documentation_url": "/",
+  "documentation_url": "/agents",
   "openapi_url": "/openapi.json",
   "llms_txt_url": "/llms.txt",
   "health_url": "/healthz",

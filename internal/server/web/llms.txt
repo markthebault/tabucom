@@ -13,6 +13,7 @@ Publish the build output, not source code. After success, return the response `u
 - Optional query `ttl=<duration>` sets deployment lifetime, for example `ttl=72h` or `ttl=90m`.
 - Content-Type: `text/html`, `text/markdown`, or `application/zip`.
 - GET /healthz checks readiness.
+- GET /agents provides the complete human-readable usage guide.
 - GET /openapi.json provides the complete machine-readable contract.
 - Path-mode content is served at `/p/{id}/`; deployments may instead use `https://{id}.<preview-domain>/` when wildcard hosting is configured. Always use the returned URL.
 - Path mode shares the service origin; wildcard preview domains provide stronger browser-origin isolation for untrusted content.

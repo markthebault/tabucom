@@ -89,7 +89,8 @@ ZIP extraction is defensive. Archives with traversal, absolute paths, duplicate 
 
 ## Discovery
 
-- `/` — human- and agent-readable usage guide
+- `/` — minimal human-facing landing page
+- `/agents` — complete human- and agent-readable usage guide
 - `/openapi.json` — OpenAPI 3.1 contract
 - `/llms.txt` — compact agent instructions
 - `/.well-known/agent.json` — structured discovery metadata
@@ -112,7 +113,7 @@ Run the black-box suite against a running server:
 BASE_URL=http://127.0.0.1:8080 ./scripts/integration-test.sh
 ```
 
-The final agent-discovery test uses Codex with a local OSS provider. It gives a fresh, read-only Codex session only the rendered homepage, asks it to derive the publish request, then executes that request in the trusted harness and verifies the returned site URL:
+The final agent-discovery test uses Codex with a local OSS provider. It verifies the landing page's agent link, gives a fresh, read-only Codex session only the rendered `/agents` guide, asks it to derive the publish request, then executes that request in the trusted harness and verifies the returned site URL:
 
 ```sh
 lms server start
@@ -123,7 +124,7 @@ BASE_URL=http://127.0.0.1:8080 \
   ./scripts/codex-agent-test.sh
 ```
 
-The default local mode does not send the internal homepage to a hosted model.
+The default local mode does not send the internal agent guide to a hosted model.
 
 To use an explicitly approved hosted endpoint instead, export its credentials without printing them and select hosted mode:
 

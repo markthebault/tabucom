@@ -333,7 +333,7 @@ func TestAPIValidationHealthAndDocs(t *testing.T) {
 			t.Fatalf("got %d %s", w.Code, w.Body.String())
 		}
 	}
-	for _, url := range []string{"http://docs.test/healthz", "http://docs.test/", "http://docs.test/openapi.json", "http://docs.test/llms.txt", "http://docs.test/.well-known/agent.json"} {
+	for _, url := range []string{"http://docs.test/healthz", "http://docs.test/", "http://docs.test/agents", "http://docs.test/openapi.json", "http://docs.test/llms.txt", "http://docs.test/.well-known/agent.json"} {
 		r := httptest.NewRequest(http.MethodGet, url, nil)
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, r)
@@ -347,9 +347,21 @@ func TestAPIValidationHealthAndDocs(t *testing.T) {
 			t.Errorf("health response does not verify storage: %s", w.Body.String())
 		}
 		if url == "http://docs.test/" {
+			for _, required := range []string{"Publish a front end. Get a URL.", "HTML", "Markdown", "immutable URL", "href=\"/agents\""} {
+				if !strings.Contains(w.Body.String(), required) {
+					t.Errorf("homepage is missing landing-page text %q", required)
+				}
+			}
+			for _, removed := range []string{"<nav", "<pre", "<table", "POST</span>"} {
+				if strings.Contains(w.Body.String(), removed) {
+					t.Errorf("homepage still contains detailed guide markup %q", removed)
+				}
+			}
+		}
+		if url == "http://docs.test/agents" {
 			for _, required := range []string{"POST", "HTML", "Markdown", "ZIP", "ttl", "30 days", "Static builds only", "http://docs.test/api/v1/publish"} {
 				if !strings.Contains(w.Body.String(), required) {
-					t.Errorf("homepage is missing agent-critical text %q", required)
+					t.Errorf("agent guide is missing agent-critical text %q", required)
 				}
 			}
 		}

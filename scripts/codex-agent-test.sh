@@ -10,11 +10,11 @@ TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/tabucom-codex.XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
 
 command -v codex >/dev/null 2>&1 || { printf 'codex CLI is required\n' >&2; exit 1; }
-curl -fsS "$BASE_URL/" >/dev/null || { printf 'service unavailable: %s\n' "$BASE_URL" >&2; exit 1; }
+curl -fsS "$BASE_URL/" | grep -q 'href="/agents"' || { printf 'agent guide link unavailable: %s\n' "$BASE_URL" >&2; exit 1; }
 
 marker="codex-agent-deployment-$(date +%s)"
-curl -fsS "$BASE_URL/" > "$TMP_DIR/homepage.html"
-prompt="The publishing service homepage is provided on stdin. Using only those instructions, specify the exact HTTP request for publishing a raw HTML page whose visible body contains the exact text '$marker'. Use the service origin $BASE_URL. Do not run commands or inspect files. Return only one JSON object with exactly these fields: method='POST', endpoint, contentType='text/html', body, spa=false, ttlHours=720. Do not use a Markdown code fence."
+curl -fsS "$BASE_URL/agents" > "$TMP_DIR/agent-guide.html"
+prompt="The publishing service's agent guide is provided on stdin. Using only those instructions, specify the exact HTTP request for publishing a raw HTML page whose visible body contains the exact text '$marker'. Use the service origin $BASE_URL. Do not run commands or inspect files. Return only one JSON object with exactly these fields: method='POST', endpoint, contentType='text/html', body, spa=false, ttlHours=720. Do not use a Markdown code fence."
 
 case "$CODEX_PROVIDER_MODE" in
   local) set -- --oss --local-provider "$CODEX_LOCAL_PROVIDER" ;;
@@ -34,7 +34,7 @@ fi
   --color never \
   --output-schema "$ROOT_DIR/testdata/codex-output-schema.json" \
   --output-last-message "$TMP_DIR/final.json" \
-  "$prompt" < "$TMP_DIR/homepage.html") 2>&1 | tee "$TMP_DIR/codex-output.txt"
+  "$prompt" < "$TMP_DIR/agent-guide.html") 2>&1 | tee "$TMP_DIR/codex-output.txt"
 
 test -s "$TMP_DIR/final.json" || { printf 'Codex produced no structured final response\n' >&2; exit 1; }
 
@@ -70,4 +70,4 @@ expires_at=$(sed -n 's/.*"expiresAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 [ -n "$site_url" ] && [ -n "$expires_at" ] || { printf 'publish response is missing url or expiresAt\n' >&2; exit 1; }
 curl -fsS "$site_url" | grep -q "$marker" || { printf 'published page does not contain the Codex marker\n' >&2; exit 1; }
 
-printf 'Codex read the homepage, derived the API request, and produced a verified deployment: %s (expires %s)\n' "$site_url" "$expires_at"
+printf 'Codex read the agent guide, derived the API request, and produced a verified deployment: %s (expires %s)\n' "$site_url" "$expires_at"

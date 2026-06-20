@@ -3,129 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Publish HTML, Markdown, or a prebuilt static site with one HTTP request and an optional custom TTL.">
-  <title>Tabucom</title>
+  <meta name="description" content="Publish HTML, Markdown, or prebuilt static sites to an immutable temporary URL with one request.">
+  <link rel="help" href="/agents">
+  <title>Tabucom · Temporary static hosting</title>
   <style>
-    :root{--ink:#17201f;--muted:#5e6966;--paper:#f5f1e9;--card:#fffdf8;--line:#d9d3c7;--accent:#0c7569;--accent2:#d45b36;--code:#15201e;--codeink:#e8f4ef;--shadow:0 14px 40px rgba(30,36,34,.08)}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:var(--accent);text-underline-offset:3px}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}.shell{width:min(1120px,calc(100% - 36px));margin:auto}.hero{padding:66px 0 54px;background:radial-gradient(circle at 88% 18%,#f7cdb7 0,transparent 30%),linear-gradient(145deg,#e2f2e9,#f7f0e5 66%);border-bottom:1px solid var(--line)}.eyebrow{text-transform:uppercase;letter-spacing:.13em;font-weight:800;font-size:.76rem;color:var(--accent);margin:0 0 10px}.hero h1{font-family:Georgia,serif;font-size:clamp(2.5rem,7vw,5.5rem);line-height:.98;letter-spacing:-.045em;max-width:850px;margin:0}.lede{font-size:clamp(1.1rem,2vw,1.35rem);max-width:800px;margin:24px 0 20px}.badges{display:flex;flex-wrap:wrap;gap:9px}.badge{background:rgba(255,255,255,.72);border:1px solid rgba(12,117,105,.25);border-radius:99px;padding:5px 11px;font-weight:700;font-size:.83rem}.boundary{max-width:830px;margin-top:22px;padding:12px 16px;border-left:4px solid var(--accent2);background:#fff8f1}.nav{position:sticky;top:0;z-index:3;background:rgba(245,241,233,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}.nav .shell{display:flex;gap:20px;overflow:auto;white-space:nowrap;padding-block:11px}.nav a{text-decoration:none;color:var(--ink);font-weight:700;font-size:.88rem}main{padding:52px 0 90px}section{scroll-margin-top:70px;margin-bottom:64px}.section-head{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;align-items:end;margin-bottom:20px}.section-head h2{font:700 clamp(1.8rem,4vw,3rem)/1.1 Georgia,serif;margin:0}.section-head p:last-child{color:var(--muted);margin:0}.grid{display:grid;gap:16px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:var(--shadow)}.card h3{margin:0 0 8px}.card p:last-child,.card ul:last-child{margin-bottom:0}.step{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:white;font-weight:800;margin-bottom:12px}.tag{display:inline-block;color:var(--accent);font-weight:800;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.codebox{position:relative;background:var(--code);border-radius:12px;color:var(--codeink);overflow:auto;margin:12px 0}.codebox pre{margin:0;padding:18px 62px 18px 18px;min-height:72px}.copy{position:absolute;right:9px;top:9px;border:1px solid #5c716c;border-radius:7px;color:#fff;background:#263531;padding:5px 9px;cursor:pointer}.copy:hover,.copy:focus-visible{background:#36504a;outline:2px solid #8ad0c2}.response{border-left:5px solid var(--accent)}.agent-rule{font-size:1.08rem;background:#e1f0ea;border:1px solid #9cc7b9;padding:17px 20px;border-radius:12px}.tree{white-space:pre-wrap;background:#ece7dc;padding:16px;border-radius:10px}.limit-table{width:100%;border-collapse:collapse;background:var(--card)}.limit-table th,.limit-table td{text-align:left;padding:11px 13px;border:1px solid var(--line)}.limit-table th{background:#e6eee9}.method{font:800 .72rem ui-monospace,monospace;color:white;background:var(--accent);border-radius:5px;padding:4px 6px;margin-right:8px}.warn{color:#9f3e22}.footer{border-top:1px solid var(--line);padding:25px 0;color:var(--muted)}.skip{position:absolute;left:-999px}.skip:focus{left:10px;top:10px;background:#fff;padding:8px;z-index:5}@media(max-width:760px){.hero{padding-top:48px}.two,.three,.section-head{grid-template-columns:1fr}.section-head{gap:8px}.card{padding:18px}.nav{position:static}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{.nav,.copy{display:none}.card{box-shadow:none}body{background:#fff}}
+    :root{--ink:#17201f;--muted:#5e6966;--paper:#f5f1e9;--line:#d9d3c7;--accent:#0c7569}
+    *{box-sizing:border-box}
+    body{margin:0;color:var(--ink);background:radial-gradient(circle at 88% 18%,#f7cdb7 0,transparent 30%),linear-gradient(145deg,#e2f2e9,#f7f0e5 66%);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{min-height:100svh;display:grid;place-items:center;padding:40px 18px}
+    .hero{width:min(920px,100%)}
+    .eyebrow{margin:0 0 16px;color:var(--accent);font-size:.76rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+    h1{max-width:850px;margin:0;font:700 clamp(3rem,9vw,7rem)/.94 Georgia,serif;letter-spacing:-.055em}
+    .lede{max-width:720px;margin:28px 0 0;color:var(--muted);font-size:clamp(1.1rem,2.2vw,1.4rem)}
+    .agent-link{display:inline-block;margin-top:42px;color:var(--muted);font-size:.82rem;text-decoration-color:color-mix(in srgb,var(--muted) 40%,transparent);text-underline-offset:4px}
+    .agent-link:hover,.agent-link:focus-visible{color:var(--accent);text-decoration-color:currentColor}
+    .agent-link:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:2px}
+    @media(max-width:600px){main{place-items:end start;padding-bottom:56px}.agent-link{margin-top:32px}}
   </style>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-  <header class="hero">
-    <div class="shell">
-      <p class="eyebrow">Tabucom · internal temporary static hosting</p>
-      <h1>Publish a front end. Get a URL.</h1>
-      <p class="lede">Send one <code>POST</code> with HTML, Markdown, or a ZIP of a prebuilt static site. Set an optional <code>ttl</code> query parameter to choose the lifetime, or omit it to keep the default <strong>30-day</strong> retention.</p>
-      <div class="badges" aria-label="Service summary"><span class="badge">No sign-in</span><span class="badge">HTML · Markdown · ZIP</span><span class="badge">Fixed 30-day expiry</span><span class="badge">Immutable deployments</span></div>
-      <div class="boundary"><strong>Static builds only.</strong> This service does not run <code>npm install</code>, Node.js servers, SSR, APIs, databases, or uploaded source code. Build on your machine or in CI, then publish the resulting <code>dist/</code> or <code>build/</code> directory.</div>
-    </div>
-  </header>
-  <nav class="nav" aria-label="Documentation"><div class="shell"><a href="#quickstart">Quick start</a><a href="#build">Node build</a><a href="#zip">ZIP layout</a><a href="#routing">URLs &amp; SPA</a><a href="#limits">Limits</a><a href="#errors">Errors</a><a href="/openapi.json">OpenAPI</a><a href="/healthz">Health</a></div></nav>
-  <main id="main" class="shell">
-    <section id="quickstart">
-      <div class="section-head"><div><p class="eyebrow">One request</p><h2>Publish from any agent or shell</h2></div><p>These commands use this page's current origin automatically. The explicit localhost forms remain valid for local development.</p></div>
-      <div class="grid three">
-        <article class="card"><span class="step">1</span><h3>HTML</h3><div class="codebox"><button class="copy" type="button">Copy</button><pre><code data-command="html">curl -sS -X POST \
-  &quot;{{ORIGIN}}/api/v1/publish?ttl=72h&quot; \
-  -H &quot;Content-Type: text/html; charset=utf-8&quot; \
-  --data-binary @index.html</code></pre></div></article>
-        <article class="card"><span class="step">2</span><h3>Markdown</h3><div class="codebox"><button class="copy" type="button">Copy</button><pre><code data-command="markdown">curl -sS -X POST \
-  &quot;{{ORIGIN}}/api/v1/publish?ttl=72h&quot; \
-  -H &quot;Content-Type: text/markdown; charset=utf-8&quot; \
-  --data-binary @report.md</code></pre></div></article>
-        <article class="card"><span class="step">3</span><h3>Static build ZIP</h3><div class="codebox"><button class="copy" type="button">Copy</button><pre><code data-command="zip">curl -sS -X POST \
-  &quot;{{ORIGIN}}/api/v1/publish?spa=1&amp;ttl=72h&quot; \
-  -H &quot;Content-Type: application/zip&quot; \
-  --data-binary @site.zip</code></pre></div></article>
-      </div>
-      <details><summary>Explicit localhost example</summary><div class="codebox"><button class="copy" type="button">Copy</button><pre><code>curl -sS -X POST "http://localhost:8080/api/v1/publish?ttl=72h" -H "Content-Type: text/html" --data-binary @index.html</code></pre></div></details>
-      <article class="card response"><span class="tag">Exact 201 response shape</span><div class="codebox"><button class="copy" type="button">Copy</button><pre><code>{
-  "id": "019f2a56-7f0d-73c3-89ef-8f0d8c499f26",
-  "url": "https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/",
-  "createdAt": "2026-06-19T14:30:00Z",
-  "expiresAt": "2026-06-22T14:30:00Z",
-  "files": 37,
-  "bytes": 1842032,
-  "spa": true
-}</code></pre></div><p>Every successful request creates a new immutable deployment. There is no update operation and the expiry cannot be extended after publication.</p></article>
-      <p class="agent-rule"><strong>Agent instruction:</strong> publish the build output, then return the deployment URL and expiry timestamp to the user.</p>
+  <main>
+    <section class="hero" aria-labelledby="title">
+      <p class="eyebrow">Tabucom · temporary static hosting</p>
+      <h1 id="title">Publish a front end. Get a URL.</h1>
+      <p class="lede">Send HTML, Markdown, or a prebuilt static site. Tabucom publishes it as an immutable URL, then removes it automatically when its lifetime ends.</p>
+      <a class="agent-link" href="/agents" rel="help">Instructions for AI agents <span aria-hidden="true">→</span></a>
     </section>
-
-    <section id="build">
-      <div class="section-head"><div><p class="eyebrow">Complete project workflow</p><h2>Build Node projects before publishing</h2></div><p>Vite, React, Vue, Svelte and similar projects are supported when they produce static browser files.</p></div>
-      <div class="grid three"><article class="card"><span class="step">1</span><h3>Build</h3><div class="codebox"><pre><code>npm ci
-npm run build</code></pre></div><p>Find the generated output, commonly <code>dist/</code> or <code>build/</code>.</p></article><article class="card"><span class="step">2</span><h3>Package its contents</h3><div class="codebox"><pre><code>(cd dist &amp;&amp; zip -qr ../site.zip .)</code></pre></div><p>ZIP the directory's <em>contents</em>, not the parent directory.</p></article><article class="card"><span class="step">3</span><h3>Publish</h3><div class="codebox"><pre><code>curl -sS -X POST \
-  "{{ORIGIN}}/api/v1/publish?spa=1&ttl=72h" \
-  -H "Content-Type: application/zip" \
-  --data-binary @site.zip</code></pre></div><p>Use <code>spa=1</code> only when client-side routing needs fallback.</p></article></div>
-    </section>
-
-    <section id="zip">
-      <div class="section-head"><div><p class="eyebrow">Archive contract</p><h2><code>index.html</code> must be at the ZIP root</h2></div><p>CSS, JavaScript, images, fonts, JSON, WASM, media, source maps, and nested asset directories are served as static files.</p></div>
-      <div class="grid two"><article class="card"><span class="tag">Accepted</span><pre class="tree">site.zip
-├── index.html
-├── assets/
-│   ├── app.js
-│   └── app.css
-└── images/logo.svg</pre></article><article class="card"><span class="tag warn">Rejected</span><pre class="tree">site.zip
-└── dist/
-    ├── index.html
-    └── assets/…</pre><p>Fix with <code>(cd dist &amp;&amp; zip -qr ../site.zip .)</code>.</p></article></div>
-    </section>
-
-    <section id="routing">
-      <div class="section-head"><div><p class="eyebrow">Serving behavior</p><h2>Path URLs by default, wildcard hosts when configured</h2></div><p>The response's <code>url</code> is authoritative. Follow it rather than constructing a URL yourself.</p></div>
-      <div class="grid two"><article class="card"><h3>Path mode</h3><p>Deployments are served at <code>/p/{id}/</code>. Build apps with relative asset paths or the matching base path. Root-relative URLs such as <code>/assets/app.js</code> point at the service root and may fail.</p><p>Path-mode deployments share the same browser origin as this documentation page and the publish API. Do not treat path mode as an isolation boundary for untrusted HTML or JavaScript.</p></article><article class="card"><h3>Wildcard-domain mode</h3><p>When <code>PREVIEW_DOMAIN</code> and wildcard DNS/TLS are configured, the service can return <code>https://{id}.preview.tools.company/</code>. This gives each deployment a separate browser origin and supports root-relative assets.</p></article></div>
-      <article class="card" style="margin-top:16px"><h3>Optional SPA fallback and TTL</h3><p>Publish with <code>?spa=1</code> for React Router or another client router. Add <code>&amp;ttl=72h</code> or another positive duration when the deployment should expire sooner or later than the default 30 days. Existing files are served normally; an unknown route returns the deployment's <code>index.html</code>. Without SPA mode, unknown paths return <code>404</code>.</p></article>
-    </section>
-
-    <section id="limits">
-      <div class="section-head"><div><p class="eyebrow">Operational contract</p><h2>Fixed expiry and bounded uploads</h2></div><p>Limits protect a no-sign-in internal service from accidental overload and hostile archives.</p></div>
-      <div style="overflow:auto"><table class="limit-table"><thead><tr><th>Rule</th><th>Default</th></tr></thead><tbody><tr><td>Lifetime</td><td>Client-selected via <code>ttl</code>; defaults to 30 days (720 hours)</td></tr><tr><td>Compressed request</td><td>100 MB maximum</td></tr><tr><td>Expanded ZIP</td><td>500 MB maximum</td></tr><tr><td>ZIP entries</td><td>10,000 maximum, including directories</td></tr><tr><td>Publish rate</td><td>60 requests/hour/network peer</td></tr></tbody></table></div>
-      <p>ZIPs with absolute paths, traversal, NUL bytes, symlinks, device files, duplicate normalized paths, conflicting file and directory paths, excessive nesting, or expansion beyond the limit are rejected. Partial uploads never become visible.</p>
-    </section>
-
-    <section id="errors">
-      <div class="section-head"><div><p class="eyebrow">Machine-readable failures</p><h2>Errors use stable codes</h2></div><p>Check the HTTP status and <code>error.code</code>; display <code>error.message</code> to the user.</p></div>
-      <div class="grid two"><article class="card"><h3>Error response</h3><div class="codebox"><button class="copy" type="button">Copy</button><pre><code>{
-  "error": {
-    "code": "missing_index",
-    "message": "site must contain index.html at its root"
-  }
-}</code></pre></div></article><article class="card"><h3>Codes</h3><ul><li><code>unsupported_media_type</code>, <code>empty_body</code>, <code>invalid_spa</code>, <code>invalid_ttl</code> — fix the request shape.</li><li><code>upload_too_large</code> / <code>too_many_files</code> — reduce the artifact.</li><li><code>invalid_archive</code> / <code>missing_index</code> — fix ZIP structure.</li><li><code>rate_limited</code> — retry after the response delay.</li><li><code>method_not_allowed</code>, <code>internal_error</code>, <code>service_unavailable</code> — correct the caller or retry later.</li></ul></article></div>
-    </section>
-
-    <section><div class="section-head"><div><p class="eyebrow">HTTP API</p><h2>Small enough to learn at a glance</h2></div><p>Machine clients can use the <a href="/openapi.json">OpenAPI 3.1 document</a>, <a href="/llms.txt">llms.txt</a>, or <a href="/.well-known/agent.json">agent discovery document</a>.</p></div><div class="grid two"><article class="card"><h3><span class="method">POST</span><code>/api/v1/publish</code></h3><p>Publish HTML, Markdown, or ZIP. Optional <code>spa=1</code> and <code>ttl=&lt;duration&gt;</code>. Returns <code>201</code> after atomic publication.</p></article><article class="card"><h3><span class="method">GET</span><code>/healthz</code></h3><p>Readiness endpoint for container and ingress health checks.</p></article></div></section>
   </main>
-  <footer class="footer"><div class="shell">Tabucom · untrusted content · temporary retention</div></footer>
-  <script>
-    (() => {
-      const origin = location.origin && location.origin !== "null" ? location.origin : "http://localhost:8080";
-      document.querySelectorAll("code").forEach((element) => {
-        if (element.textContent.includes("{{ORIGIN}}")) element.textContent = element.textContent.replaceAll("{{ORIGIN}}", origin);
-      });
-      document.querySelectorAll(".copy").forEach((button) => button.addEventListener("click", async () => {
-        const code = button.nextElementSibling?.querySelector("code");
-        if (!code) return;
-        button.textContent = "Copying";
-        try {
-          await Promise.race([
-            navigator.clipboard.writeText(code.textContent),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), 500))
-          ]);
-          button.textContent = "Copied";
-        } catch {
-          const range = document.createRange();
-          range.selectNodeContents(code);
-          const selection = window.getSelection();
-          selection.removeAllRanges();
-          selection.addRange(range);
-          button.textContent = "Selected";
-        }
-        setTimeout(() => { button.textContent = "Copy"; }, 1600);
-      }));
-    })();
-  </script>
 </body>
 </html>

@@ -6,6 +6,7 @@
     "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site. Deployments expire at the client-requested TTL or after the default 30-day retention window when omitted. Uploaded code is never executed."
   },
   "servers": [{"url": "/", "description": "Current service origin"}],
+  "externalDocs": {"description": "Complete publishing guide", "url": "/agents"},
   "paths": {
     "/api/v1/publish": {
       "post": {
