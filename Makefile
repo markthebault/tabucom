@@ -1,5 +1,6 @@
 IMAGE_REPOSITORY ?= markthebault/tabucom
 IMAGE_TAG ?= latest
+IMAGE_PLATFORM ?= linux/amd64
 IMAGE := $(IMAGE_REPOSITORY):$(IMAGE_TAG)
 
 .PHONY: fmt test vet check build docker-build docker-push
@@ -19,7 +20,7 @@ build:
 	go build ./cmd/tabucom
 
 docker-build:
-	docker build --tag $(IMAGE) .
+	docker buildx build --platform $(IMAGE_PLATFORM) --tag $(IMAGE) --load .
 
-docker-push: docker-build
-	docker push $(IMAGE)
+docker-push:
+	docker buildx build --platform $(IMAGE_PLATFORM) --tag $(IMAGE) --push .

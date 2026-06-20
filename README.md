@@ -27,30 +27,34 @@ Local data is stored under the configured `DATA_DIR`. Use a disposable directory
 Build and start the one-container service with a persistent volume:
 
 ```sh
-docker build -t tabucom .
+docker build --platform linux/amd64 -t tabucom .
 docker run --rm -p 8080:8080 \
   -e PUBLIC_API_URL=http://localhost:8080 \
   -v tabucom-data:/data \
   tabucom
 ```
 
-The Makefile defaults to `markthebault/tabucom:latest`. Build or push that image with:
+The Makefile defaults to `markthebault/tabucom:latest` for `linux/amd64`, so an ARM Mac produces an image suitable for an AMD64 VPS. Buildx handles the cross-platform build:
 
 ```sh
 make docker-build
 make docker-push
 ```
 
-Override the repository or tag when needed:
+Override the repository, tag, or target platform when needed:
 
 ```sh
-make docker-push IMAGE_REPOSITORY=markthebault/tabucom IMAGE_TAG=v1.0.0
+make docker-push \
+  IMAGE_REPOSITORY=markthebault/tabucom \
+  IMAGE_TAG=v1.0.0 \
+  IMAGE_PLATFORM=linux/amd64
 ```
 
 Pushes to `main` run the same build and push through GitHub Actions after tests pass. Configure these repository settings:
 
 - Variable `DOCKER_IMAGE_REPOSITORY` (defaults to `markthebault/tabucom`)
 - Variable `DOCKER_IMAGE_TAG` (defaults to `latest`)
+- Variable `DOCKER_IMAGE_PLATFORM` (defaults to `linux/amd64`)
 - Secret `DOCKERHUB_USERNAME`
 - Secret `DOCKERHUB_TOKEN` containing a Docker Hub access token with push access
 
