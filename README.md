@@ -1,162 +1,96 @@
 # Tabucom
 
-A single-container internal service for publishing HTML, Markdown, or complete prebuilt static sites at temporary URLs. Every immutable deployment expires at the client-requested TTL, or after the default 30-day retention window when omitted. There are no accounts, update operations, or application-level authentication.
+Temporary static hosting in one small container. Publish HTML, Markdown, or a prebuilt ZIP and get an immutable URL that expires automatically—no accounts required.
 
-The service hosts static output only. Build a Node project locally or in CI and upload its `dist/` or `build/` output; the server never runs npm, Node.js, SSR, or uploaded code.
+Tabucom is intended for trusted internal networks. It serves uploaded files but never executes them or runs build commands.
 
-This is designed for internal use behind network controls. Operators should put the publish host behind VPN, SSO, or another trusted ingress layer before exposing it to humans or agents.
+## Features
 
-## Run locally
+- One HTTP API and one persistent volume
+- HTML, Markdown, and prebuilt static-site ZIP uploads
+- Per-deployment TTLs with a 30-day default
+- Optional SPA fallback and wildcard subdomains
+- Defensive ZIP extraction and configurable resource limits
+- OpenAPI and agent-discovery endpoints included
 
-With Go installed:
-
-```sh
-go run ./cmd/tabucom
-```
-
-Then open <http://localhost:8080/> or check readiness:
-
-```sh
-curl -fsS http://localhost:8080/healthz
-```
-
-Local data is stored under the configured `DATA_DIR`. Use a disposable directory for development.
-
-## Run with Docker
-
-Build and start the one-container service with a persistent volume:
+## Quick start
 
 ```sh
-docker build --platform linux/amd64 -t tabucom .
-docker run --rm -p 8080:8080 \
-  -e PUBLIC_API_URL=http://localhost:8080 \
-  -v tabucom-data:/data \
-  tabucom
+docker compose up --build
 ```
 
-The Makefile defaults to `markthebault/tabucom:latest` for `linux/amd64`, so an ARM Mac produces an image suitable for an AMD64 VPS. Buildx handles the cross-platform build:
+Tabucom is now available at <http://localhost:8080>. Publish a page:
 
 ```sh
-make docker-build
-make docker-push
+curl -sS -X POST http://localhost:8080/api/v1/publish \
+  -H 'Content-Type: text/html' \
+  --data-binary '<!doctype html><title>Hello</title><h1>Hello from Tabucom</h1>'
 ```
 
-Override the repository, tag, or target platform when needed:
+The `201` response includes the deployment's immutable `url` and `expiresAt` timestamp:
 
-```sh
-make docker-push \
-  IMAGE_REPOSITORY=markthebault/tabucom \
-  IMAGE_TAG=v1.0.0 \
-  IMAGE_PLATFORM=linux/amd64
+```json
+{
+  "id": "…",
+  "createdAt": "…",
+  "expiresAt": "…",
+  "files": 1,
+  "bytes": 62,
+  "spa": false,
+  "url": "http://localhost:8080/p/…/"
+}
 ```
 
-Pushes to `main` run the same build and push through GitHub Actions after tests pass. Configure these repository settings:
-
-- Variable `DOCKER_IMAGE_REPOSITORY` (defaults to `markthebault/tabucom`)
-- Variable `DOCKER_IMAGE_TAG` (defaults to `latest`)
-- Variable `DOCKER_IMAGE_PLATFORM` (defaults to `linux/amd64`)
-- Secret `DOCKERHUB_USERNAME`
-- Secret `DOCKERHUB_TOKEN` containing a Docker Hub access token with push access
-
-In production, terminate TLS at the company ingress and mount persistent storage at `/data`. Set `PUBLIC_API_URL` to the externally reachable publish origin so returned deployment URLs do not depend on proxy headers. Restrict the publish host to the corporate network or VPN. If wildcard DNS/TLS is configured, route both the publish host and `*.$PREVIEW_DOMAIN` to this container.
+Use `Content-Type: text/markdown` for Markdown, or upload an `application/zip` archive containing `index.html` at its root. Add `?spa=1` for client-side routing and `?ttl=72h` for a custom lifetime.
 
 ## Configuration
 
-| Variable | Default | Purpose |
+The most commonly used environment variables are:
+
+| Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `8080` | HTTP listen port (overrides `LISTEN_ADDR`). |
-| `LISTEN_ADDR` | `:8080` | Full listen address when `PORT` is unset. |
-| `DATA_DIR` | `./data` (`/data` in container) | Persistent sites, metadata, and temporary uploads. |
-| `TTL` | `720h` | Default deployment retention when the publish request omits `ttl`. |
-| `SWEEP_INTERVAL` | `1h` | How often expired deployments are removed. |
-| `PUBLIC_API_URL` | Request origin | External publishing origin used in links and responses. |
-| `PREVIEW_DOMAIN` | empty | Optional wildcard preview domain. Empty selects `/p/{id}/` path URLs. |
-| `MAX_UPLOAD_BYTES` | `104857600` | Maximum compressed request size (100 MB). |
-| `MAX_EXPANDED_BYTES` | `524288000` | Maximum extracted ZIP size (500 MB). |
-| `MAX_FILES` | `10000` | Maximum number of ZIP entries, including directories. |
-| `RATE_LIMIT_PER_HOUR` | `60` | Maximum publish requests per network peer per hour. |
+| `PUBLIC_API_URL` | request origin | Public URL used in API responses |
+| `DATA_DIR` | `./data` | Persistent deployment storage |
+| `TTL` | `720h` | Default deployment lifetime |
+| `PREVIEW_DOMAIN` | empty | Wildcard domain for isolated preview origins |
+| `MAX_UPLOAD_BYTES` | `104857600` | Maximum request size |
+| `MAX_EXPANDED_BYTES` | `524288000` | Maximum expanded ZIP size |
 
-Clients can override deployment lifetime per request with `?ttl=<duration>`. When omitted, the service default remains `720h`. See the landing page and `internal/server/web/openapi.json` for entry-count and rate limits and the full API contract.
+See the hosted `/agents` guide or `/openapi.json` endpoint for the complete API and configuration limits.
 
-## Publish
+## DNS and TLS
 
-HTML:
+For isolated preview subdomains, choose a base hostname such as `preview.example.com` and point both it and its wildcard to the Tabucom server:
 
-```sh
-curl -sS -X POST http://localhost:8080/api/v1/publish \
-  -H 'Content-Type: text/html; charset=utf-8' \
-  --data-binary @index.html
+```dns
+preview.example.com    A      192.0.2.10
+*.preview.example.com  CNAME  preview.example.com.
 ```
 
-Markdown:
+Use an `AAAA` record as well when the server has IPv6. The wildcard may instead point directly to the server with `A` and `AAAA` records.
 
-```sh
-curl -sS -X POST http://localhost:8080/api/v1/publish \
-  -H 'Content-Type: text/markdown; charset=utf-8' \
-  --data-binary @report.md
+Configure Tabucom with:
+
+```env
+PUBLIC_API_URL=https://preview.example.com
+PREVIEW_DOMAIN=preview.example.com
 ```
 
-A Node-generated static site:
+The reverse proxy must route both `preview.example.com` and `*.preview.example.com` to Tabucom while preserving the request host. TLS must cover both names, using either one certificate with both names or separate exact and wildcard certificates.
 
-```sh
-npm ci
-npm run build
-(cd dist && zip -qr ../site.zip .)
-curl -sS -X POST 'http://localhost:8080/api/v1/publish?spa=1' \
-  -H 'Content-Type: application/zip' \
-  --data-binary @site.zip
-```
-
-To choose a custom lifetime, add a `ttl` query parameter with a positive duration such as `?ttl=72h` or `?spa=1&ttl=168h`. The ZIP must have a regular `index.html` file at its root. `spa=1` makes unknown paths fall back to `index.html`; omit it for normal static 404 behavior. Always use the `url` returned in the `201` JSON response and report both `url` and `expiresAt` to the user.
-
-ZIP extraction is defensive. Archives with traversal, absolute paths, duplicate normalized paths, conflicting file and directory paths, symlinks, device files, excessive nesting, or size and entry-count overages are rejected.
-
-## Discovery
-
-- `/` — minimal human-facing landing page
-- `/agents` — complete human- and agent-readable usage guide
-- `/openapi.json` — OpenAPI 3.1 contract
-- `/llms.txt` — compact agent instructions
-- `/.well-known/agent.json` — structured discovery metadata
-- `/healthz` — readiness check
-
-## Security Model
-
-Uploaded HTML, CSS, and JavaScript run in the viewer's browser. In path mode, deployments under `/p/{id}/` share the same browser origin as the service landing page and API. That means untrusted content can interact with same-origin browser storage for that host. If you need origin isolation or root-relative asset paths, configure `PREVIEW_DOMAIN` and serve deployments from wildcard subdomains instead.
+Wildcard certificates require DNS-01 validation. Use a DNS provider supported by your certificate resolver, or automate the required `_acme-challenge` TXT records. If a CDN or DNS proxy cannot issue or serve certificates for these wildcard hosts, leave the records DNS-only and terminate TLS on your server.
 
 ## Development
 
+Requires Go 1.23 or newer.
+
 ```sh
+go run ./cmd/tabucom
 make check
 ```
 
-Run the black-box suite against a running server:
+Read [the architecture guide](docs/architecture.md) for the request lifecycle, storage model, and security boundaries. Contributor and integration-test commands are in [AGENTS.md](AGENTS.md).
 
-```sh
-BASE_URL=http://127.0.0.1:8080 ./scripts/integration-test.sh
-```
+## Security
 
-The final agent-discovery test uses Codex with a local OSS provider. It verifies the landing page's agent link, gives a fresh, read-only Codex session only the rendered `/agents` guide, asks it to derive the publish request, then executes that request in the trusted harness and verifies the returned site URL:
-
-```sh
-lms server start
-lms load <local-model-key> --identifier codex-local -y
-BASE_URL=http://127.0.0.1:8080 \
-  CODEX_LOCAL_PROVIDER=lmstudio \
-  CODEX_MODEL=codex-local \
-  ./scripts/codex-agent-test.sh
-```
-
-The default local mode does not send the internal agent guide to a hosted model.
-
-To use an explicitly approved hosted endpoint instead, export its credentials without printing them and select hosted mode:
-
-```sh
-set -a; . ./.env; set +a
-BASE_URL=http://127.0.0.1:8080 \
-  CODEX_PROVIDER_MODE=hosted \
-  CODEX_MODEL=gpt-5.4 \
-  ./scripts/codex-agent-test.sh
-```
-
-Operational and contributor commands are kept in [AGENTS.md](./AGENTS.md).
+Put Tabucom behind a VPN, SSO, or trusted ingress; it has no application-level authentication. Uploaded JavaScript runs in visitors' browsers. Configure `PREVIEW_DOMAIN` with wildcard DNS and TLS when deployments require origin isolation.

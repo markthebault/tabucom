@@ -1,4 +1,4 @@
-IMAGE_REPOSITORY ?= markthebault/tabucom
+IMAGE_REPOSITORY ?= tabucom
 IMAGE_TAG ?= latest
 IMAGE_PLATFORM ?= linux/amd64
 IMAGE := $(IMAGE_REPOSITORY):$(IMAGE_TAG)

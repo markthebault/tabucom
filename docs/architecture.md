@@ -1,0 +1,71 @@
+# Architecture
+
+Tabucom is a single Go HTTP service backed by a local filesystem. It accepts already-built static content, publishes it atomically, serves it until expiry, and removes it in the background. There is no database, queue, external cache, or uploaded-code execution.
+
+## System overview
+
+```mermaid
+flowchart LR
+    C["Publisher"] -->|"POST /api/v1/publish"| H["Go HTTP server"]
+    H --> V["Validate and stage"]
+    V -->|"HTML"| F["index.html"]
+    V -->|"Markdown"| M["Safe HTML renderer"]
+    V -->|"ZIP"| Z["Defensive extractor"]
+    F --> S["Staging directory"]
+    M --> S
+    Z --> S
+    S -->|"atomic rename"| D["Immutable deployment"]
+    D -->|"GET /p/id/ or wildcard host"| B["Visitor browser"]
+    W["Expiry sweeper"] --> D
+```
+
+The executable in `cmd/tabucom` loads configuration, creates the server, and manages graceful shutdown. The `internal/server` package owns routing, publication, storage, static serving, expiry, rate limiting, and embedded discovery pages.
+
+## Publish lifecycle
+
+1. `POST /api/v1/publish` is rate-limited by the request's network peer.
+2. The server validates `Content-Type`, `spa`, `ttl`, and request-size limits.
+3. A random UUID and a temporary directory are created under `DATA_DIR/sites`.
+4. HTML is streamed to `index.html`, Markdown is rendered to escaped HTML, or a ZIP is defensively extracted. Every input must produce a regular root `index.html`.
+5. The server writes private metadata containing creation time, expiry, file count, byte count, and SPA behavior.
+6. The staging directory is renamed to its final UUID. Because both paths share a parent filesystem, a deployment becomes visible atomically.
+7. The API returns `201` with both `url` and `expiresAt`.
+
+Failures remove the staging directory, so visitors cannot observe partial deployments. Published directories are never modified.
+
+## Storage model
+
+```text
+DATA_DIR/
+└── sites/
+    ├── .staging-*/           temporary, never served
+    └── <deployment-uuid>/
+        ├── .site.json        private metadata
+        ├── index.html
+        └── ...               uploaded static assets
+```
+
+Storage is deliberately local and simple. A persistent volume is required across container restarts. The current design expects one replica; horizontal scaling requires shared deployment storage, and rate-limit state would remain inconsistent because it is process-local.
+
+At startup and every `SWEEP_INTERVAL`, the server removes expired deployments, deployments with unreadable metadata, abandoned staging directories, and stale rate-limit buckets. Expired sites also fail closed at request time, so cleanup timing cannot extend their availability.
+
+## Serving deployments
+
+Path mode serves deployments from `/p/{id}/`. When `PREVIEW_DOMAIN` is set, `{id}.<preview-domain>` is used instead and is routed as a static-only origin before API routes.
+
+Only regular files are served. Directory requests resolve to `index.html`; SPA deployments additionally fall back to the root `index.html` for missing extensionless `GET` requests. Cache lifetimes are capped at five minutes and never cross deployment expiry.
+
+The landing page, OpenAPI document, `llms.txt`, and agent metadata are embedded into the binary and exposed through an explicit route allowlist.
+
+## Security boundaries
+
+- Uploaded content is data: the server never invokes an interpreter, package manager, or build tool.
+- ZIP entries are rejected for traversal, absolute paths, duplicate normalized names, path conflicts, excessive depth, symlinks, and special files. Compressed size, expanded size, and entry count are bounded.
+- Metadata is not addressable from deployment URLs.
+- Publication is unauthenticated by design. Network ingress must provide access control.
+- In path mode, uploaded pages share the service origin. Wildcard mode should be used when browser-origin isolation is required.
+- Client IP rate limits use the direct socket address and do not trust forwarded-address headers.
+
+## Design constraints
+
+Changes should preserve four core properties: uploaded code is never executed, deployments are immutable, visibility is atomic, and expiry is enforced while serving as well as during cleanup. API, landing-page examples, OpenAPI, `llms.txt`, and agent discovery metadata must remain synchronized when behavior changes.
