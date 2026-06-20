@@ -13,13 +13,26 @@ Tabucom is intended for trusted internal networks. It serves uploaded files but 
 - Defensive ZIP extraction and configurable resource limits
 - OpenAPI and agent-discovery endpoints included
 
-## Quick start
+## Usage
+
+Run the published image without cloning the repository:
+
+```sh
+docker run --rm -p 8080:8080 \
+  -e PUBLIC_API_URL=http://localhost:8080 \
+  -v tabucom-data:/data \
+  ghcr.io/markthebault/tabucom:latest
+```
+
+Tabucom is now available at <http://localhost:8080>. The named volume keeps deployments across container restarts.
+
+To build the image from source instead:
 
 ```sh
 docker compose up --build
 ```
 
-Tabucom is now available at <http://localhost:8080>. Publish a page:
+Publish a page:
 
 ```sh
 curl -sS -X POST http://localhost:8080/api/v1/publish \
