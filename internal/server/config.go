@@ -1,0 +1,162 @@
+package server
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const deploymentTTL = 30 * 24 * time.Hour
+
+// Config contains server behavior, storage settings, and operational limits.
+// Fields remain explicit instead of accepting arbitrary environment keys so a
+// deployment has a small, reviewable configuration surface.
+type Config struct {
+	// ListenAddr is the address passed to http.Server by the executable.
+	ListenAddr string
+	// DataDir is the parent of the private deployment storage directory.
+	DataDir string
+	// BaseURL overrides request-derived public API URLs when set.
+	BaseURL string
+	// PreviewDomain enables isolated wildcard deployment origins when set.
+	PreviewDomain string
+
+	// TTL is the default retention used when a client omits the ttl query value.
+	TTL time.Duration
+	// SweepInterval controls how often expired and abandoned data is removed.
+	SweepInterval time.Duration
+
+	// MaxUploadBytes limits compressed archives and direct text request bodies.
+	MaxUploadBytes int64
+	// MaxExpandedSize limits ZIP expansion and rendered Markdown output.
+	MaxExpandedSize int64
+	// MaxFiles limits all ZIP entries, including directories.
+	MaxFiles int
+	// RateLimitPerHour limits publications per remote address in this process.
+	RateLimitPerHour int
+
+	// Now is injectable for deterministic expiry and rate-limit tests.
+	Now func() time.Time
+}
+
+// DefaultConfig returns conservative production defaults. Callers may override
+// them directly in tests or through ConfigFromEnv in the executable.
+func DefaultConfig() Config {
+	return Config{
+		ListenAddr:       ":8080",
+		DataDir:          "./data",
+		TTL:              deploymentTTL,
+		SweepInterval:    time.Hour,
+		MaxUploadBytes:   100 << 20,
+		MaxExpandedSize:  500 << 20,
+		MaxFiles:         10000,
+		RateLimitPerHour: 60,
+		Now:              time.Now,
+	}
+}
+
+// ConfigFromEnv overlays supported environment variables on the defaults and
+// validates the complete result. Environment values are normalized here so the
+// rest of the package can rely on stable URL and domain forms.
+func ConfigFromEnv() (Config, error) {
+	cfg := DefaultConfig()
+
+	if value := os.Getenv("LISTEN_ADDR"); value != "" {
+		cfg.ListenAddr = value
+	}
+	if value := os.Getenv("PORT"); value != "" {
+		port, err := strconv.Atoi(value)
+		if err != nil || port < 1 || port > 65535 {
+			return cfg, errors.New("PORT must be an integer between 1 and 65535")
+		}
+		// PORT intentionally wins over LISTEN_ADDR for common platform hosts.
+		cfg.ListenAddr = ":" + value
+	}
+	if value := os.Getenv("DATA_DIR"); value != "" {
+		cfg.DataDir = value
+	}
+
+	// PUBLIC_API_URL is the documented name. BASE_URL remains a compatibility
+	// fallback for existing installations.
+	cfg.BaseURL = strings.TrimRight(os.Getenv("PUBLIC_API_URL"), "/")
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = strings.TrimRight(os.Getenv("BASE_URL"), "/")
+	}
+	cfg.PreviewDomain = strings.ToLower(strings.TrimSuffix(os.Getenv("PREVIEW_DOMAIN"), "."))
+
+	var err error
+	if cfg.TTL, err = durationFromEnv("TTL", cfg.TTL); err != nil {
+		return cfg, err
+	}
+	if cfg.SweepInterval, err = durationFromEnv("SWEEP_INTERVAL", cfg.SweepInterval); err != nil {
+		return cfg, err
+	}
+	if cfg.MaxUploadBytes, err = int64FromEnv("MAX_UPLOAD_BYTES", cfg.MaxUploadBytes); err != nil {
+		return cfg, err
+	}
+	if cfg.MaxExpandedSize, err = int64FromEnv("MAX_EXPANDED_BYTES", cfg.MaxExpandedSize); err != nil {
+		return cfg, err
+	}
+	if cfg.MaxFiles, err = intFromEnv("MAX_FILES", cfg.MaxFiles); err != nil {
+		return cfg, err
+	}
+	if cfg.RateLimitPerHour, err = intFromEnv("RATE_LIMIT_PER_HOUR", cfg.RateLimitPerHour); err != nil {
+		return cfg, err
+	}
+
+	return cfg, cfg.validate()
+}
+
+// durationFromEnv parses one optional duration while preserving its setting name
+// in errors, which makes deployment failures actionable.
+func durationFromEnv(name string, fallback time.Duration) (time.Duration, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback, fmt.Errorf("%s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+// int64FromEnv parses byte-oriented limits without narrowing them to int.
+func int64FromEnv(name string, fallback int64) (int64, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return fallback, fmt.Errorf("%s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+// intFromEnv parses count-oriented limits using the platform's native int size.
+func intFromEnv(name string, fallback int) (int, error) {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback, fmt.Errorf("%s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+// validate rejects values that would disable retention or resource bounds. The
+// service never supports unlimited uploads, expansion, entry counts, or TTLs.
+func (cfg Config) validate() error {
+	if cfg.DataDir == "" || cfg.TTL <= 0 || cfg.SweepInterval <= 0 ||
+		cfg.MaxUploadBytes <= 0 || cfg.MaxExpandedSize <= 0 ||
+		cfg.MaxFiles <= 0 || cfg.RateLimitPerHour <= 0 {
+		return errors.New("data directory, durations, and limits must be positive")
+	}
+	return nil
+}
