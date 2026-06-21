@@ -1,3 +1,10 @@
+/*
+This file tests the supported Markdown subset and its escaping boundary.
+It verifies active content remains inert after rendering and publication.
+The tests also document headings, lists, code fences, links, and tables.
+It depends on shared HTTP publication helpers and standard test utilities,
+including filesystem reads of the committed rendered index.
+*/
 package server
 
 import (

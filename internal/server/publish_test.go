@@ -1,3 +1,10 @@
+/*
+This file tests direct HTML publication, metadata, TTLs, and request validation.
+It verifies the returned URL through the public router and committed filesystem.
+Rate-limit cases protect the process-local publisher admission policy.
+It depends on shared HTTP test helpers and standard filesystem and time packages,
+with deterministic clocks used where exact expiry behavior matters.
+*/
 package server
 
 import (

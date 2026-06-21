@@ -1,3 +1,10 @@
+/*
+This file owns defensive validation and extraction of uploaded ZIP sites.
+It runs during publication while content is still inside a staging directory.
+Path normalization, type checks, and expansion limits protect local storage.
+It depends only on Go archive, filesystem, path, and HTTP primitives,
+while publish.go supplies client errors and configured resource limits.
+*/
 package server
 
 import (

@@ -1,3 +1,10 @@
+/*
+This file implements Tabucom's deliberately small Markdown renderer.
+It converts trusted syntax subsets while escaping all uploaded active HTML.
+Publication writes the resulting standalone document as the deployment index.
+It depends only on standard formatting, HTML escaping, and string packages,
+avoiding a parser dependency for the limited supported feature set.
+*/
 package server
 
 import (

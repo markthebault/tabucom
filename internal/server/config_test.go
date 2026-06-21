@@ -1,3 +1,10 @@
+/*
+This file tests environment parsing, precedence, defaults, and validation.
+It protects the operator-facing configuration contract used by cmd/tabucom.
+S3 settings are checked as optional additions to the local-storage defaults.
+It depends on Go's testing and time packages and the Config helpers,
+with each test using isolated process environment values.
+*/
 package server
 
 import (

@@ -1,3 +1,10 @@
+/*
+This file is the executable entry point for the Tabucom service.
+It loads environment configuration, constructs the internal HTTP server,
+applies production timeouts, and coordinates graceful process shutdown.
+It depends on the standard HTTP, signal, logging, and context packages,
+plus internal/server for all hosting and persistence behavior.
+*/
 package main
 
 import (

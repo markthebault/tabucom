@@ -1,3 +1,10 @@
+/*
+This file embeds and serves Tabucom's landing and discovery documents.
+An explicit route allowlist keeps private templates from becoming public assets.
+Public origins are substituted safely for human and machine-facing examples.
+It depends on standard embed, filesystem, HTML escaping, MIME, path, and HTTP APIs,
+and supplies the embedded password template parsed by password.go.
+*/
 package server
 
 import (

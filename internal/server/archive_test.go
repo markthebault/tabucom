@@ -1,3 +1,10 @@
+/*
+This file tests successful and hostile ZIP publication scenarios.
+It verifies archive limits, traversal defenses, atomic cleanup, and serving.
+Tests exercise requests through the complete Server HTTP routing boundary.
+It depends on server_test.go helpers and synthetic ZIP fixtures,
+plus standard HTTP, filesystem, string, and testing packages.
+*/
 package server
 
 import (

@@ -1,3 +1,10 @@
+/*
+This file provides the opt-in lifecycle test for real S3-compatible storage.
+It covers health, ZIP publication, assets, password login, expiry, and cleanup.
+The test is skipped unless S3_TEST_ENDPOINT and AWS credentials are available.
+It depends on the AWS SDK, shared HTTP test helpers, and a RustFS-style endpoint,
+while temporary local storage handles upload staging.
+*/
 package server
 
 import (

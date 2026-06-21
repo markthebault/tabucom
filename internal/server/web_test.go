@@ -1,3 +1,10 @@
+/*
+This file tests health responses and every embedded public discovery document.
+It verifies routing, method policy, origin substitution, and required guide copy.
+The password template remains private because web.go exposes only allowlisted paths.
+It depends on shared isolated server fixtures and standard HTTP test and string APIs,
+with table-driven cases covering the complete embedded web surface.
+*/
 package server
 
 import (

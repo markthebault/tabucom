@@ -1,3 +1,10 @@
+/*
+This file defines the stable JSON response conventions for Tabucom's API.
+It centralizes success encoding, client error envelopes, and no-store headers.
+Publish and health handlers use these helpers instead of encoding independently.
+It depends only on Go's standard JSON and HTTP packages,
+and intentionally exposes no storage or routing concerns.
+*/
 package server
 
 import (

@@ -1,3 +1,10 @@
+/*
+This file provides package-level architecture and security documentation.
+It explains how publication, immutable storage, serving, and cleanup interact.
+The text is context for maintainers rather than executable implementation.
+It has no runtime dependencies and complements the focused source files,
+whose responsibilities and invariants are summarized below.
+*/
 // Package server implements Tabucom's temporary, immutable static hosting service.
 //
 // # Scope

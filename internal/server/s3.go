@@ -1,3 +1,10 @@
+/*
+This file implements optional S3-compatible immutable deployment storage.
+Metadata objects act as commit markers because object stores lack atomic rename.
+Serving, sweeping, and health checks mirror the local filesystem semantics.
+It depends on the AWS SDK for configuration, signing, and S3 operations,
+plus standard context, JSON, MIME, path, streaming, and time packages.
+*/
 package server
 
 import (

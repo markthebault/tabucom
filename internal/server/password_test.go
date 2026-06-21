@@ -1,3 +1,10 @@
+/*
+This file tests password publication and the complete browser unlock lifecycle.
+It covers persistence safety, validation, forms, cookies, throttling, and SPA use.
+Requests pass through the public router to preserve real integration boundaries.
+It depends on shared server test helpers and standard HTTP test utilities,
+plus temporary filesystem reads for private metadata assertions.
+*/
 package server
 
 // These tests stay at the HTTP boundary because password protection spans

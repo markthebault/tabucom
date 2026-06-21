@@ -1,3 +1,10 @@
+/*
+This file contains shared fixtures for server package behavior tests.
+It creates isolated production-shaped servers and routes synthetic HTTP requests.
+Helpers decode public responses, inspect errors, and build in-memory ZIP archives.
+It depends on standard archive, JSON, HTTP test, filesystem, and time packages,
+and is reused by each focused test file in this package.
+*/
 package server
 
 import (

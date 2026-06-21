@@ -1,3 +1,10 @@
+/*
+This file coordinates validation, staging, metadata creation, and publication.
+It accepts raw HTML, Markdown, or ZIP bodies and never executes uploaded code.
+Local and S3 backends receive the same fully validated immutable deployment.
+It depends on standard HTTP, MIME, filesystem, networking, crypto, and time APIs,
+while archive.go, markdown.go, password.go, and storage helpers do focused work.
+*/
 package server
 
 import (

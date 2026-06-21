@@ -1,3 +1,10 @@
+/*
+This file defines Tabucom's complete runtime configuration contract.
+It provides defaults, reads supported environment variables, and validates them.
+The executable consumes Config while server components use its explicit limits.
+It depends only on standard environment, conversion, error, and time packages,
+keeping operational configuration independent from storage implementations.
+*/
 package server
 
 import (

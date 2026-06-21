@@ -1,3 +1,10 @@
+/*
+This file implements per-deployment password verification and browser login.
+It connects private metadata, Argon2id hashing, throttling, and scoped cookies.
+Both local and S3 serving paths call this gate before resolving static content.
+It depends on standard crypto, HTTP, template, encoding, and time packages,
+plus x/crypto/argon2 and the password dialog embedded by web.go.
+*/
 package server
 
 import (

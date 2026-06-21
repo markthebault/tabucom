@@ -1,3 +1,10 @@
+/*
+This file owns the Server lifecycle, route dispatch, and background sweeping.
+It connects configuration to local or S3 storage and exposes the HTTP handler.
+Endpoint-specific policy remains in focused publish, site, password, and web files.
+It depends on standard HTTP, filesystem, synchronization, logging, and time APIs,
+plus package-local storage and response helpers.
+*/
 // Package server implements Tabucom's HTTP API and immutable static-site host.
 //
 // The package deliberately separates request routing from publication, archive

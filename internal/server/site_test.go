@@ -1,3 +1,10 @@
+/*
+This file tests local deployment serving, expiry, cleanup, caching, and routing.
+It checks exact time boundaries, SPA fallback, private metadata, and stale stages.
+All requests use the complete Server handler and isolated temporary storage.
+It depends on shared publication fixtures and standard HTTP test, filesystem,
+path, testing, and time packages.
+*/
 package server
 
 import (

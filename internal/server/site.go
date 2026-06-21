@@ -1,3 +1,10 @@
+/*
+This file resolves, serves, expires, and removes local filesystem deployments.
+It recognizes path and wildcard URLs while keeping metadata inaccessible.
+Serving applies SPA fallback, cache policy, security headers, and password gates.
+It depends on standard crypto, JSON, network, HTTP, path, filesystem, and time APIs,
+while s3.go mirrors these semantics for object storage.
+*/
 package server
 
 import (
