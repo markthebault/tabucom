@@ -56,9 +56,19 @@ The `201` response includes the deployment's immutable `url`, `expiresAt`, and p
 }
 ```
 
-Use `Content-Type: text/markdown` for Markdown, or upload an `application/zip` archive containing `index.html` at its root. Add `?spa=1` for client-side routing and `?ttl=72h` for a custom lifetime.
+Use `Content-Type: text/markdown` for Markdown, or upload an `application/zip` archive containing `index.html` at its root. Publish only the final static artifact that a browser can serve directly. Do not upload project source files. Add `?spa=1` for client-side routing and `?ttl=72h` for a custom lifetime.
 
 Add `-H 'Tabucom-Password: correct horse'` to set a custom 8–128 character printable ASCII password, or add `?generatePassword=1` to generate one. Protected responses include `"protected": true` and `"password"`; visitors enter that password in Tabucom's form and remain unlocked until expiry. Do not combine the two options. Use HTTPS in production so passwords and cookies are encrypted in transit.
+
+## Agent execution rules
+
+1. Determine the publish origin from the user, environment, or project config. Prefer `TABUCOM_ORIGIN` when available.
+2. Always publish built static output only. Common build directories are `dist/`, `build/`, `out/`, and `public/`.
+3. If no build output exists, run the project build command only when obvious, such as `npm run build`, `pnpm build`, or `yarn build`.
+4. For ZIP publishing, zip the contents of the build directory rather than the directory itself, ensure `index.html` is at the ZIP root, and use `spa=1` for React, Vue, Vite, SvelteKit static, Angular, or other client-side routers.
+5. Never upload source code directories, `node_modules`, `.git`, secrets, `.env`, or backend/server code.
+6. On success, return only `url`, `expiresAt`, `password` if returned, and `protected`.
+7. On failure, read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
 
 ## Configuration
 

@@ -4,7 +4,20 @@ Publish HTML, Markdown, or a ZIP containing a prebuilt static site with one HTTP
 
 ## Agent behavior
 
-Publish the build output, not source code. After success, return `url`, `expiresAt`, and any returned `password` to the user.
+Publish only the final static artifact that a browser can serve directly. Do not upload project source files.
+
+## Agent execution rules
+
+1. Determine the publish origin from the user, environment, or project config. Prefer `TABUCOM_ORIGIN` when available. Example: `https://tabucom.vps.mark-thebault.pro`.
+2. Always publish built static output only. Common build directories: `dist/`, `build/`, `out/`, `public/`.
+3. If no build output exists, run the project build command only when obvious: `npm run build`, `pnpm build`, `yarn build`.
+4. For ZIP publishing:
+   - zip the contents of the build directory, not the directory itself.
+   - ensure `index.html` exists at ZIP root.
+   - use `spa=1` for React, Vue, Vite, SvelteKit static, Angular, or other client-side routers.
+5. Never upload: source code directories, `node_modules`, `.git`, secrets, `.env`, or backend/server code.
+6. On success, return only: `url`, `expiresAt`, `password` if returned, and `protected`.
+7. On failure: read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
 
 ## API
 
@@ -23,18 +36,18 @@ Publish the build output, not source code. After success, return `url`, `expires
 ## Examples
 
 HTML:
-`curl -sS -X POST "$ORIGIN/api/v1/publish?ttl=72h" -H "Content-Type: text/html" --data-binary @index.html`
+`curl -sS -X POST "{{ORIGIN}}/api/v1/publish?ttl=72h" -H "Content-Type: text/html" --data-binary @index.html`
 
 HTML with a generated password:
-`curl -sS -X POST "$ORIGIN/api/v1/publish?generatePassword=1" -H "Content-Type: text/html" --data-binary @index.html`
+`curl -sS -X POST "{{ORIGIN}}/api/v1/publish?generatePassword=1" -H "Content-Type: text/html" --data-binary @index.html`
 
 Markdown:
-`curl -sS -X POST "$ORIGIN/api/v1/publish" -H "Content-Type: text/markdown" --data-binary @report.md`
+`curl -sS -X POST "{{ORIGIN}}/api/v1/publish" -H "Content-Type: text/markdown" --data-binary @report.md`
 
 Node static build:
 `npm ci && npm run build`
 `(cd dist && zip -qr ../site.zip .)`
-`curl -sS -X POST "$ORIGIN/api/v1/publish?spa=1&ttl=72h" -H "Content-Type: application/zip" --data-binary @site.zip`
+`curl -sS -X POST "{{ORIGIN}}/api/v1/publish?spa=1&ttl=72h" -H "Content-Type: application/zip" --data-binary @site.zip`
 
 The ZIP must contain a regular `index.html` file at its root. The service never runs Node.js, npm, SSR, server code, APIs, databases, or build commands.
 
