@@ -23,6 +23,11 @@ type Config struct {
 	BaseURL string
 	// PreviewDomain enables isolated wildcard deployment origins when set.
 	PreviewDomain string
+	S3Bucket      string
+	S3Endpoint    string
+	S3Region      string
+	S3Prefix      string
+	S3PathStyle   bool
 
 	// TTL is the default retention used when a client omits the ttl query value.
 	TTL time.Duration
@@ -48,6 +53,7 @@ func DefaultConfig() Config {
 	return Config{
 		ListenAddr:       ":8080",
 		DataDir:          "./data",
+		S3Region:         "us-east-1",
 		TTL:              deploymentTTL,
 		SweepInterval:    time.Hour,
 		MaxUploadBytes:   100 << 20,
@@ -86,6 +92,20 @@ func ConfigFromEnv() (Config, error) {
 		cfg.BaseURL = strings.TrimRight(os.Getenv("BASE_URL"), "/")
 	}
 	cfg.PreviewDomain = strings.ToLower(strings.TrimSuffix(os.Getenv("PREVIEW_DOMAIN"), "."))
+	cfg.S3Bucket = strings.TrimSpace(os.Getenv("S3_BUCKET"))
+	cfg.S3Endpoint = strings.TrimRight(strings.TrimSpace(os.Getenv("S3_ENDPOINT")), "/")
+	cfg.S3Region = strings.TrimSpace(os.Getenv("S3_REGION"))
+	if cfg.S3Region == "" {
+		cfg.S3Region = "us-east-1"
+	}
+	cfg.S3Prefix = strings.Trim(strings.TrimSpace(os.Getenv("S3_PREFIX")), "/")
+	if value := os.Getenv("S3_PATH_STYLE"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return cfg, errors.New("S3_PATH_STYLE must be true or false")
+		}
+		cfg.S3PathStyle = parsed
+	}
 
 	var err error
 	if cfg.TTL, err = durationFromEnv("TTL", cfg.TTL); err != nil {
@@ -157,6 +177,9 @@ func (cfg Config) validate() error {
 		cfg.MaxUploadBytes <= 0 || cfg.MaxExpandedSize <= 0 ||
 		cfg.MaxFiles <= 0 || cfg.RateLimitPerHour <= 0 {
 		return errors.New("data directory, durations, and limits must be positive")
+	}
+	if cfg.S3Bucket != "" && cfg.S3Region == "" {
+		return errors.New("S3_REGION must not be empty when S3_BUCKET is set")
 	}
 	return nil
 }

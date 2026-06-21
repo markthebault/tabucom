@@ -1,6 +1,6 @@
 # Architecture
 
-Tabucom is a single Go HTTP service backed by a local filesystem. It accepts already-built static content, publishes it atomically, serves it until expiry, and removes it in the background. There is no database, queue, external cache, or uploaded-code execution.
+Tabucom is a single Go HTTP service backed by the local filesystem or optional S3-compatible object storage. It accepts already-built static content, publishes it atomically, serves it until expiry, and removes it in the background. There is no database, queue, external cache, or uploaded-code execution.
 
 ## System overview
 
@@ -45,7 +45,7 @@ DATA_DIR/
         └── ...               uploaded static assets
 ```
 
-Storage is deliberately local and simple. A persistent volume is required across container restarts. The current design expects one replica; horizontal scaling requires shared deployment storage, and rate-limit state would remain inconsistent because it is process-local.
+Local storage remains the default and requires a persistent volume across container restarts. Setting `S3_BUCKET` stores committed deployment files in S3-compatible object storage instead; temporary validation and ZIP extraction still use `DATA_DIR`. S3 files are uploaded before `.site.json`, which acts as the visibility marker because object stores do not provide atomic directory rename. Incomplete prefixes remain invisible and are removed after one hour.
 
 At startup and every `SWEEP_INTERVAL`, the server removes expired deployments, deployments with unreadable metadata, abandoned staging directories, and stale rate-limit buckets. Expired sites also fail closed at request time, so cleanup timing cannot extend their availability.
 

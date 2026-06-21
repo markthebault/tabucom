@@ -21,6 +21,7 @@ import (
 type Server struct {
 	cfg   Config
 	sites string
+	s3    *s3Storage
 
 	// stop and done coordinate the expiry worker without leaking a goroutine.
 	// closeOnce makes Close safe for callers that share server ownership.
@@ -56,6 +57,13 @@ func New(cfg Config) (*Server, error) {
 		stop:  make(chan struct{}),
 		done:  make(chan struct{}),
 		rates: make(map[string]rateBucket),
+	}
+	if cfg.S3Bucket != "" {
+		var err error
+		s.s3, err = newS3Storage(cfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := s.Sweep(); err != nil {
 		// Cleanup failure should be observable, but it should not prevent healthy
@@ -156,6 +164,14 @@ func (s *Server) serveSiteRequest(w http.ResponseWriter, r *http.Request, id, re
 // Merely checking that the directory exists would miss read-only mounts and
 // permission changes that make new publications impossible.
 func (s *Server) health(w http.ResponseWriter) {
+	if s.s3 != nil {
+		if err := s.s3.health(); err != nil {
+			apiError(w, http.StatusServiceUnavailable, "service_unavailable", "storage health check failed")
+			return
+		}
+		jsonReply(w, http.StatusOK, map[string]any{"status": "ok", "storage": "s3", "ttlSeconds": int64(s.cfg.TTL.Seconds()), "publishLimit": s.cfg.RateLimitPerHour})
+		return
+	}
 	file, err := os.CreateTemp(s.sites, ".health-")
 	if err != nil {
 		apiError(w, http.StatusServiceUnavailable, "service_unavailable", "storage is not writable")
