@@ -117,9 +117,15 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The staging directory and destination share a parent, so Rename provides
-	// atomic visibility: readers observe either no deployment or the complete one.
-	if err := os.Rename(stage, filepath.Join(s.sites, id)); err != nil {
+	var commitErr error
+	if s.s3 != nil {
+		commitErr = s.s3.commit(stage, id)
+	} else {
+		// The staging directory and destination share a parent, so Rename provides
+		// atomic visibility: readers observe either no deployment or the complete one.
+		commitErr = os.Rename(stage, filepath.Join(s.sites, id))
+	}
+	if commitErr != nil {
 		apiError(w, http.StatusInternalServerError, "internal_error", "could not commit site")
 		return
 	}

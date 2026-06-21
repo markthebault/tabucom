@@ -45,6 +45,30 @@ func TestConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestS3ConfigIsOptional(t *testing.T) {
+	t.Setenv("S3_BUCKET", "")
+	config, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.S3Bucket != "" {
+		t.Fatalf("S3Bucket=%q", config.S3Bucket)
+	}
+
+	t.Setenv("S3_BUCKET", "deployments")
+	t.Setenv("S3_ENDPOINT", "http://127.0.0.1:9000/")
+	t.Setenv("S3_REGION", "auto")
+	t.Setenv("S3_PREFIX", "/tabucom/")
+	t.Setenv("S3_PATH_STYLE", "true")
+	config, err = ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.S3Bucket != "deployments" || config.S3Endpoint != "http://127.0.0.1:9000" || config.S3Region != "auto" || config.S3Prefix != "tabucom" || !config.S3PathStyle {
+		t.Fatalf("unexpected S3 config: %+v", config)
+	}
+}
+
 // TestConfigFromEnvRejectsInvalidValues covers parse errors and values that parse
 // successfully but would disable an operational resource bound.
 func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {

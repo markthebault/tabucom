@@ -63,13 +63,20 @@ The most commonly used environment variables are:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PUBLIC_API_URL` | request origin | Public URL used in API responses |
-| `DATA_DIR` | `./data` | Persistent deployment storage |
+| `DATA_DIR` | `./data` | Local deployment storage and upload staging directory |
+| `S3_BUCKET` | unset | Enables S3-compatible storage when set; otherwise `DATA_DIR` is used |
+| `S3_ENDPOINT` | AWS default | Optional endpoint for Cloudflare R2, RustFS, or another S3-compatible service |
+| `S3_REGION` | `us-east-1` | Signing region; use `auto` for Cloudflare R2 |
+| `S3_PREFIX` | unset | Optional object-key prefix |
+| `S3_PATH_STYLE` | `false` | Use path-style bucket URLs; commonly required by local endpoints |
 | `TTL` | `720h` | Default deployment lifetime |
 | `PREVIEW_DOMAIN` | empty | Wildcard domain for isolated preview origins |
 | `MAX_UPLOAD_BYTES` | `104857600` | Maximum request size |
 | `MAX_EXPANDED_BYTES` | `524288000` | Maximum expanded ZIP size |
 
 See the hosted `/agents` guide or `/openapi.json` endpoint for the complete API and configuration limits.
+
+Set `S3_BUCKET` to store deployments in AWS S3, Cloudflare R2, RustFS, or another S3-compatible service. Credentials use the standard AWS environment variables or credential chain. For R2, set `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com` and `S3_REGION=auto`. If `S3_BUCKET` is unset, local storage is unchanged.
 
 ## DNS and TLS
 
@@ -100,6 +107,16 @@ Requires Go 1.23 or newer.
 ```sh
 go run ./cmd/tabucom
 make check
+```
+
+The opt-in S3 lifecycle test is compatible with RustFS:
+
+```sh
+docker run --rm -d --name tabucom-rustfs -p 19000:9000 rustfs/rustfs:latest
+AWS_ACCESS_KEY_ID=rustfsadmin AWS_SECRET_ACCESS_KEY=rustfsadmin \
+  AWS_EC2_METADATA_DISABLED=true S3_TEST_ENDPOINT=http://127.0.0.1:19000 \
+  go test ./internal/server -run TestRustFSLifecycle -v
+docker stop tabucom-rustfs
 ```
 
 Read [the architecture guide](docs/architecture.md) for the request lifecycle, storage model, and security boundaries. Contributor and integration-test commands are in [AGENTS.md](AGENTS.md).

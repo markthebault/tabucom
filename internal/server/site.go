@@ -62,6 +62,10 @@ func (s *Server) wildcardSiteRequest(r *http.Request) (id, requested string, ok 
 // serveSite resolves a file only within an immutable deployment. Expired or
 // unreadable metadata makes the entire deployment indistinguishable from absent.
 func (s *Server) serveSite(w http.ResponseWriter, r *http.Request, id, requested string) {
+	if s.s3 != nil {
+		s.serveS3Site(w, r, id, requested)
+		return
+	}
 	root := filepath.Join(s.sites, id)
 	metadata, err := readMetadata(root)
 	now := s.cfg.Now().UTC()
@@ -169,6 +173,10 @@ func writeMetadata(root string, metadata Metadata) error {
 // Sweep removes expired deployments, invalid deployment directories, abandoned
 // staging directories, and rate-limit buckets older than their fixed window.
 func (s *Server) Sweep() error {
+	if s.s3 != nil {
+		s.removeExpiredRateBuckets(s.cfg.Now())
+		return s.s3.sweep(s.cfg.Now().UTC())
+	}
 	entries, err := os.ReadDir(s.sites)
 	if err != nil {
 		return err
