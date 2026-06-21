@@ -173,6 +173,14 @@ func (s *Server) serveS3Site(w http.ResponseWriter, r *http.Request, id, request
 		http.NotFound(w, r)
 		return
 	}
+	if metadata.Password == nil && r.Method == http.MethodPost {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.authorizeSite(w, r, id, metadata) {
+		return
+	}
 
 	requested = normalizeSitePath(requested, r.URL.Path)
 	// Metadata remains private even when traversal-like URL paths normalize to it.
@@ -201,7 +209,11 @@ func (s *Server) serveS3Site(w http.ResponseWriter, r *http.Request, id, request
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-	w.Header().Set("Cache-Control", deploymentCacheControl(metadata.ExpiresAt, now))
+	if metadata.Password != nil {
+		w.Header().Set("Cache-Control", "private, no-store")
+	} else {
+		w.Header().Set("Cache-Control", deploymentCacheControl(metadata.ExpiresAt, now))
+	}
 	if object.ContentType != nil {
 		w.Header().Set("Content-Type", *object.ContentType)
 	}

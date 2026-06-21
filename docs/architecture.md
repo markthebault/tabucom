@@ -24,12 +24,12 @@ The executable in `cmd/tabucom` loads configuration, creates the server, and man
 ## Publish lifecycle
 
 1. `POST /api/v1/publish` is rate-limited by the request's network peer.
-2. The server validates `Content-Type`, `spa`, `ttl`, and request-size limits.
+2. The server validates `Content-Type`, `spa`, `ttl`, optional password settings, and request-size limits.
 3. A random UUID and a temporary directory are created under `DATA_DIR/sites`.
 4. HTML is streamed to `index.html`, Markdown is rendered to escaped HTML, or a ZIP is defensively extracted. Every input must produce a regular root `index.html`.
-5. The server writes private metadata containing creation time, expiry, file count, byte count, and SPA behavior.
+5. The server writes private metadata containing creation time, expiry, file count, byte count, SPA behavior, and optional Argon2id password data. Plaintext passwords are never stored.
 6. The staging directory is renamed to its final UUID. Because both paths share a parent filesystem, a deployment becomes visible atomically.
-7. The API returns `201` with both `url` and `expiresAt`.
+7. The API returns `201` with `url`, `expiresAt`, `protected`, and the password when protection was requested.
 
 Failures remove the staging directory, so visitors cannot observe partial deployments. Published directories are never modified.
 
@@ -54,6 +54,8 @@ At startup and every `SWEEP_INTERVAL`, the server removes expired deployments, d
 Path mode serves deployments from `/p/{id}/`. When `PREVIEW_DOMAIN` is set, `{id}.<preview-domain>` is used instead and is routed as a static-only origin before API routes.
 
 Only regular files are served. Directory requests resolve to `index.html`; SPA deployments additionally fall back to the root `index.html` for missing extensionless `GET` requests. Cache lifetimes are capped at five minutes and never cross deployment expiry.
+
+Protected deployments authorize before local-file or S3-object resolution. Unauthenticated requests receive a no-store password form; successful submissions set an HttpOnly, host-only, deployment-scoped cookie that expires with the deployment. Protected content is private and not cached. Password submissions are limited to 10 per minute per deployment and network peer. Production password protection requires HTTPS.
 
 The landing page, OpenAPI document, `llms.txt`, and agent metadata are embedded into the binary and exposed through an explicit route allowlist.
 
