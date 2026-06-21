@@ -149,11 +149,11 @@ func (s *Server) serveFallbackRoute(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// serveSiteRequest applies the common method policy shared by path-based and
-// wildcard deployment URLs before delegating file resolution.
+// serveSiteRequest permits POST only so protected deployments can accept the
+// built-in password form. Unprotected deployments reject it after metadata load.
 func (s *Server) serveSiteRequest(w http.ResponseWriter, r *http.Request, id, requested string) {
-	if !isReadMethod(r.Method) {
-		w.Header().Set("Allow", "GET, HEAD")
+	if !isReadMethod(r.Method) && r.Method != http.MethodPost {
+		w.Header().Set("Allow", "GET, HEAD, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}

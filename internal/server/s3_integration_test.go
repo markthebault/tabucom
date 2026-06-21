@@ -67,6 +67,20 @@ func TestRustFSLifecycle(t *testing.T) {
 		t.Fatalf("asset status=%d body=%q", asset.Code, asset.Body.String())
 	}
 
+	protected, protectedResponse := publishWithPassword(t, server, "", "rustfs-password")
+	requireStatus(t, protectedResponse, http.StatusCreated)
+	locked := httptest.NewRecorder()
+	server.ServeHTTP(locked, httptest.NewRequest(http.MethodGet, protected.URL, nil))
+	requireStatus(t, locked, http.StatusUnauthorized)
+	login := httptest.NewRecorder()
+	server.ServeHTTP(login, passwordRequest(protected.URL, protected.Password))
+	requireStatus(t, login, http.StatusSeeOther)
+	unlockedRequest := httptest.NewRequest(http.MethodGet, protected.URL, nil)
+	unlockedRequest.AddCookie(login.Result().Cookies()[0])
+	unlocked := httptest.NewRecorder()
+	server.ServeHTTP(unlocked, unlockedRequest)
+	requireStatus(t, unlocked, http.StatusOK)
+
 	now = published.ExpiresAt
 	if err := server.Sweep(); err != nil {
 		t.Fatal(err)

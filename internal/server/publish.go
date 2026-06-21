@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
@@ -20,28 +22,38 @@ var errEmptyBody = errors.New("request body is empty")
 // The file count and byte count describe expanded, servable content rather than
 // the transport encoding of the upload.
 type Metadata struct {
+	ID        string            `json:"id"`
+	CreatedAt time.Time         `json:"createdAt"`
+	ExpiresAt time.Time         `json:"expiresAt"`
+	Files     int               `json:"files"`
+	Bytes     int64             `json:"bytes"`
+	SPA       bool              `json:"spa"`
+	Password  *passwordMetadata `json:"password,omitempty"`
+}
+
+// publishResponse is deliberately separate from persisted metadata so password
+// hashes and cookie tokens can never enter the public API response.
+type publishResponse struct {
 	ID        string    `json:"id"`
+	URL       string    `json:"url"`
 	CreatedAt time.Time `json:"createdAt"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	Files     int       `json:"files"`
 	Bytes     int64     `json:"bytes"`
 	SPA       bool      `json:"spa"`
-}
-
-// publishResponse embeds metadata so the API returns expiry information and the
-// immutable deployment URL in one document.
-type publishResponse struct {
-	Metadata
-	URL string `json:"url"`
+	Protected bool      `json:"protected"`
+	Password  string    `json:"password,omitempty"`
 }
 
 // publishOptions is the validated portion of a publish request that influences
 // storage. Parsing it before staging avoids creating temporary directories for
 // malformed requests.
 type publishOptions struct {
-	contentType string
-	spa         bool
-	ttl         time.Duration
+	contentType      string
+	spa              bool
+	ttl              time.Duration
+	password         string
+	generatePassword bool
 }
 
 // stagedContent reports the exact deployment size after transformation or ZIP
@@ -51,7 +63,7 @@ type stagedContent struct {
 	bytes int64
 }
 
-// rateBucket implements a fixed one-hour publication window for one client.
+// rateBucket implements a fixed rate-limit window for one client and action.
 type rateBucket struct {
 	start time.Time
 	count int
@@ -104,6 +116,14 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := s.cfg.Now().UTC()
+	password := options.password
+	if options.generatePassword {
+		password, err = randomSecret(18)
+		if err != nil {
+			apiError(w, http.StatusInternalServerError, "internal_error", "could not generate password")
+			return
+		}
+	}
 	metadata := Metadata{
 		ID:        id,
 		CreatedAt: now,
@@ -111,6 +131,13 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		Files:     content.files,
 		Bytes:     content.bytes,
 		SPA:       options.spa,
+	}
+	if password != "" {
+		metadata.Password, err = newPasswordMetadata(password)
+		if err != nil {
+			apiError(w, http.StatusInternalServerError, "internal_error", "could not protect site")
+			return
+		}
 	}
 	if err := writeMetadata(stage, metadata); err != nil {
 		apiError(w, http.StatusInternalServerError, "internal_error", "could not write metadata")
@@ -131,8 +158,9 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonReply(w, http.StatusCreated, publishResponse{
-		Metadata: metadata,
-		URL:      s.siteURL(r, id),
+		ID: metadata.ID, URL: s.siteURL(r, id), CreatedAt: metadata.CreatedAt,
+		ExpiresAt: metadata.ExpiresAt, Files: metadata.Files, Bytes: metadata.Bytes,
+		SPA: metadata.SPA, Protected: metadata.Password != nil, Password: password,
 	})
 }
 
@@ -156,8 +184,40 @@ func (s *Server) parsePublishOptions(r *http.Request) (publishOptions, error) {
 	if err != nil {
 		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_ttl", "ttl must be a positive duration such as 72h or 90m"}
 	}
+	generatePassword, err := parseBool(r.URL.Query().Get("generatePassword"))
+	if err != nil {
+		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_generate_password", "generatePassword must be 1, 0, true, or false"}
+	}
+	passwordValues, passwordSet := r.Header[http.CanonicalHeaderKey("Tabucom-Password")]
+	password := r.Header.Get("Tabucom-Password")
+	if generatePassword && passwordSet {
+		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_password", "Tabucom-Password and generatePassword cannot be used together"}
+	}
+	if passwordSet && (len(passwordValues) != 1 || !validPassword(password)) {
+		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_password", "password must be 8 to 128 printable ASCII characters"}
+	}
 
-	return publishOptions{contentType: contentType, spa: spa, ttl: ttl}, nil
+	return publishOptions{contentType: contentType, spa: spa, ttl: ttl, password: password, generatePassword: generatePassword}, nil
+}
+
+func validPassword(password string) bool {
+	if len(password) < 8 || len(password) > 128 {
+		return false
+	}
+	for _, character := range []byte(password) {
+		if character < 0x20 || character > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+func randomSecret(bytes int) (string, error) {
+	value := make([]byte, bytes)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
 // supportedContentType is kept separate so media-type policy has one definition.
@@ -243,6 +303,14 @@ func streamRequestBody(w http.ResponseWriter, r *http.Request, target string, ma
 // allowPublish applies a process-local fixed window using the remote socket
 // address. Proxy trust is intentionally not inferred from spoofable headers.
 func (s *Server) allowPublish(r *http.Request) (time.Duration, bool) {
+	return s.allowRate("publish:"+networkPeer(r), time.Hour, s.cfg.RateLimitPerHour)
+}
+
+func (s *Server) allowPasswordAttempt(r *http.Request, id string) (time.Duration, bool) {
+	return s.allowRate("password:"+id+":"+networkPeer(r), time.Minute, 10)
+}
+
+func networkPeer(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
@@ -250,22 +318,25 @@ func (s *Server) allowPublish(r *http.Request) (time.Duration, bool) {
 	if host == "" {
 		host = "unknown"
 	}
+	return host
+}
 
+func (s *Server) allowRate(key string, window time.Duration, limit int) (time.Duration, bool) {
 	now := s.cfg.Now()
 	s.rateMu.Lock()
 	defer s.rateMu.Unlock()
 
-	bucket := s.rates[host]
-	if bucket.start.IsZero() || now.Sub(bucket.start) >= time.Hour {
-		s.rates[host] = rateBucket{start: now, count: 1}
+	bucket := s.rates[key]
+	if bucket.start.IsZero() || now.Sub(bucket.start) >= window {
+		s.rates[key] = rateBucket{start: now, count: 1}
 		return 0, true
 	}
-	if bucket.count >= s.cfg.RateLimitPerHour {
-		return time.Hour - now.Sub(bucket.start), false
+	if bucket.count >= limit {
+		return window - now.Sub(bucket.start), false
 	}
 
 	bucket.count++
-	s.rates[host] = bucket
+	s.rates[key] = bucket
 	return 0, true
 }
 

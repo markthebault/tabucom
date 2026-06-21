@@ -44,6 +44,21 @@ assert_url "$html_url"
 curl -fsS "$html_url" | grep -q 'raw-html-published' || fail "published HTML marker missing"
 pass 'raw HTML publish and fetch'
 
+protected_status=$(curl -sS -o "$TMP_DIR/protected.json" -w '%{http_code}' -X POST \
+  -H 'Content-Type: text/html' -H 'Tabucom-Password: integration-password' \
+  --data-binary "@$ROOT_DIR/testdata/page.html" "$BASE_URL/api/v1/publish")
+[ "$protected_status" = 201 ] || fail "protected publish returned HTTP $protected_status"
+protected_url=$(json_string url < "$TMP_DIR/protected.json")
+protected_password=$(json_string password < "$TMP_DIR/protected.json")
+[ "$protected_password" = integration-password ] || fail 'protected response omitted the password'
+locked_status=$(curl -sS -o "$TMP_DIR/password-form.html" -w '%{http_code}' "$protected_url")
+[ "$locked_status" = 401 ] || fail "protected URL returned HTTP $locked_status before login"
+login_status=$(curl -sS -o /dev/null -c "$TMP_DIR/cookies.txt" -w '%{http_code}' \
+  -H 'Content-Type: application/x-www-form-urlencoded' --data 'password=integration-password' "$protected_url")
+[ "$login_status" = 303 ] || fail "password login returned HTTP $login_status"
+curl -fsS -b "$TMP_DIR/cookies.txt" "$protected_url" | grep -q 'raw-html-published' || fail 'unlocked page marker missing'
+pass 'password-protected publish and unlock'
+
 publish 'text/markdown; charset=utf-8' "$ROOT_DIR/testdata/report.md" '' "$TMP_DIR/markdown.json"
 markdown_url=$(json_string url < "$TMP_DIR/markdown.json")
 [ -n "$markdown_url" ] || fail "Markdown response has no url"

@@ -3,7 +3,7 @@
   "info": {
     "title": "Tabucom API",
     "version": "1.0.0",
-    "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site. Deployments expire at the client-requested TTL or after the default 30-day retention window when omitted. Uploaded code is never executed."
+    "description": "Publish HTML, Markdown, or a ZIP containing a prebuilt static site with optional single-password protection. Deployments expire at the client-requested TTL or after the default 30-day retention window when omitted. Uploaded code is never executed."
   },
   "servers": [{"url": "/", "description": "Current service origin"}],
   "externalDocs": {"description": "Complete publishing guide", "url": "/agents"},
@@ -27,6 +27,20 @@
             "required": false,
             "description": "Optional deployment lifetime as a Go-style duration such as 72h or 90m. Defaults to 720h when omitted.",
             "schema": {"type": "string", "examples": ["72h", "90m", "168h"]}
+          },
+          {
+            "name": "generatePassword",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 to generate a 24-character visitor password. Cannot be combined with Tabucom-Password.",
+            "schema": {"type": "string", "enum": ["0", "1"], "default": "0"}
+          },
+          {
+            "name": "Tabucom-Password",
+            "in": "header",
+            "required": false,
+            "description": "Custom visitor password containing 8 to 128 printable ASCII characters. Never put custom passwords in URLs.",
+            "schema": {"type": "string", "minLength": 8, "maxLength": 128}
           }
         ],
         "requestBody": {
@@ -40,7 +54,7 @@
         "responses": {
           "201": {
             "description": "Published",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-06-22T14:30:00Z","files":37,"bytes":1842032,"spa":true}}}
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"https://publish.tools.company/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-06-22T14:30:00Z","files":37,"bytes":1842032,"spa":true,"protected":true,"password":"generated-or-custom-password"}}}
           },
           "400": {"$ref": "#/components/responses/ClientError"},
           "413": {"$ref": "#/components/responses/ClientError"},
@@ -66,14 +80,24 @@
           {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
           {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."}
         ],
-        "responses": {"200":{"description":"Published static content"},"404":{"description":"Deployment not found, expired, or missing the requested file"}}
+        "responses": {"200":{"description":"Published static content"},"401":{"description":"Password form for a protected deployment"},"404":{"description":"Deployment not found, expired, or missing the requested file"}}
+      },
+      "post": {
+        "operationId": "unlockPublishedSite",
+        "summary": "Unlock a password-protected deployment in a browser",
+        "parameters": [
+          {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
+          {"name":"path","in":"path","required":true,"schema":{"type":"string"}}
+        ],
+        "requestBody": {"required":true,"content":{"application/x-www-form-urlencoded":{"schema":{"type":"object","required":["password"],"properties":{"password":{"type":"string"}}}}}},
+        "responses": {"303":{"description":"Password accepted; an HttpOnly cookie was set and the browser is redirected"},"401":{"description":"Incorrect password"},"429":{"description":"Too many password attempts"}}
       }
     }
   },
   "components": {
     "schemas": {
-      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"CreatedAt plus the requested ttl, or 720 hours when ttl is omitted."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"}}},
-      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["empty_body","invalid_archive","invalid_spa","invalid_ttl","internal_error","method_not_allowed","missing_index","rate_limited","service_unavailable","too_many_files","unsupported_media_type","upload_too_large"]},"message":{"type":"string"}}}}}
+      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa","protected"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"CreatedAt plus the requested ttl, or 720 hours when ttl is omitted."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"},"protected":{"type":"boolean"},"password":{"type":"string","description":"Present for protected deployments, including custom-password requests."}}},
+      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["empty_body","invalid_archive","invalid_generate_password","invalid_password","invalid_spa","invalid_ttl","internal_error","method_not_allowed","missing_index","rate_limited","service_unavailable","too_many_files","unsupported_media_type","upload_too_large"]},"message":{"type":"string"}}}}}
     },
     "responses": {
       "ClientError": {"description":"The upload was rejected", "content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},

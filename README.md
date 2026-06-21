@@ -9,6 +9,7 @@ Tabucom is intended for trusted internal networks. It serves uploaded files but 
 - One HTTP API and one persistent volume
 - HTML, Markdown, and prebuilt static-site ZIP uploads
 - Per-deployment TTLs with a 30-day default
+- Optional generated or custom single-password protection
 - Optional SPA fallback and wildcard subdomains
 - Defensive ZIP extraction and configurable resource limits
 - OpenAPI and agent-discovery endpoints included
@@ -40,7 +41,7 @@ curl -sS -X POST http://localhost:8080/api/v1/publish \
   --data-binary '<!doctype html><title>Hello</title><h1>Hello from Tabucom</h1>'
 ```
 
-The `201` response includes the deployment's immutable `url` and `expiresAt` timestamp:
+The `201` response includes the deployment's immutable `url`, `expiresAt`, and protection state:
 
 ```json
 {
@@ -49,12 +50,15 @@ The `201` response includes the deployment's immutable `url` and `expiresAt` tim
   "expiresAt": "…",
   "files": 1,
   "bytes": 62,
+  "protected": false,
   "spa": false,
   "url": "http://localhost:8080/p/…/"
 }
 ```
 
 Use `Content-Type: text/markdown` for Markdown, or upload an `application/zip` archive containing `index.html` at its root. Add `?spa=1` for client-side routing and `?ttl=72h` for a custom lifetime.
+
+Add `-H 'Tabucom-Password: correct horse'` to set a custom 8–128 character printable ASCII password, or add `?generatePassword=1` to generate one. Protected responses include `"protected": true` and `"password"`; visitors enter that password in Tabucom's form and remain unlocked until expiry. Do not combine the two options. Use HTTPS in production so passwords and cookies are encrypted in transit.
 
 ## Configuration
 
@@ -123,4 +127,4 @@ Read [the architecture guide](docs/architecture.md) for the request lifecycle, s
 
 ## Security
 
-Put Tabucom behind a VPN, SSO, or trusted ingress; it has no application-level authentication. Uploaded JavaScript runs in visitors' browsers. Configure `PREVIEW_DOMAIN` with wildcard DNS and TLS when deployments require origin isolation.
+Publishing has no application-level authentication, so put Tabucom behind a VPN, SSO, or trusted ingress when publishing must be restricted. Per-deployment passwords protect visitor access, not the publish API. Uploaded JavaScript runs in visitors' browsers. Configure `PREVIEW_DOMAIN` with wildcard DNS and TLS when deployments require origin isolation.

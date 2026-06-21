@@ -59,8 +59,9 @@
 // selecting arbitrary names beneath the storage root.
 //
 // The .site.json manifest is server-private. It records the ID, creation time,
-// exact expiry, expanded file count, expanded byte count, and SPA behavior. It is
-// written before commit and explicitly blocked by static path resolution.
+// exact expiry, expanded file count, expanded byte count, SPA behavior, and
+// optional password hash, salt, and cookie token. It is written before commit and
+// explicitly blocked by static path resolution. Plaintext passwords are omitted.
 //
 // Deployments with missing or malformed manifests fail closed: they are not served
 // and are eligible for removal during Sweep because their retention cannot be
@@ -73,7 +74,7 @@
 //
 //  1. Account for the request in the process-local fixed rate-limit window.
 //  2. Parse and allowlist the Content-Type media type.
-//  3. Parse the optional spa flag and positive ttl duration.
+//  3. Parse optional SPA, TTL, and password-protection settings.
 //  4. Reject a known oversized Content-Length as an early optimization.
 //  5. Allocate a cryptographically random version-4 UUID.
 //  6. Create an unservable staging directory under sites.
@@ -81,7 +82,7 @@
 //  8. Require a regular index.html at the staging root.
 //  9. Write immutable metadata with an absolute UTC expiry instant.
 //  10. Atomically rename the complete stage to its deployment UUID.
-//  11. Return both the deployment URL and expiresAt to the client.
+//  11. Return the URL, expiry, protection state, and password when protected.
 //
 // Parsing Content-Length is not the upload security boundary. Requests may omit it
 // or send a misleading value. Every body is therefore read through MaxBytesReader,
@@ -95,9 +96,8 @@
 // for the deployment. The persisted absolute expiry, not a process timer, is the
 // source of truth across process restarts.
 //
-// The API response embeds Metadata and adds URL. This keeps CreatedAt, ExpiresAt,
-// file accounting, SPA behavior, and the immutable retrieval location consistent
-// with the manifest committed to disk.
+// The API response copies only public metadata fields, so the password hash,
+// salt, and cookie token in the private manifest cannot be serialized publicly.
 //
 // # ZIP threat model
 //
@@ -193,7 +193,8 @@
 //
 // Path mode appends /p/{id}/ to the API base. Wildcard mode preserves the derived
 // scheme and combines the deployment ID with the configured preview domain. Every
-// successful publish response includes that URL and the matching absolute expiry.
+// successful publish response includes that URL, the matching absolute expiry,
+// and its password when protection was requested.
 //
 // # Cleanup and concurrency
 //

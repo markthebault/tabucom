@@ -1,12 +1,12 @@
 {
   "schema_version": "1.0",
   "name": "Tabucom",
-  "description": "Publishes HTML, Markdown, or prebuilt static-site ZIPs at immutable URLs with a client-selected TTL or a 30-day default.",
+  "description": "Publishes HTML, Markdown, or prebuilt static-site ZIPs at immutable URLs with optional single-password protection and expiry.",
   "documentation_url": "/agents",
   "openapi_url": "/openapi.json",
   "llms_txt_url": "/llms.txt",
   "health_url": "/healthz",
-  "instructions": "Publish the build output, not project source. Send one POST to /api/v1/publish, optionally add ttl=<duration>, and return the response url and expiresAt to the user.",
+  "instructions": "Publish the build output, not project source. Send one POST to /api/v1/publish, optionally select a TTL and password protection, and return url, expiresAt, and any returned password to the user.",
   "capabilities": {
     "publish": {
       "method": "POST",
@@ -14,8 +14,10 @@
       "content_types": ["text/html", "text/markdown", "application/zip"],
       "spa_query": "spa=1",
       "ttl_query": "ttl=<duration>",
+      "custom_password_header": "Tabucom-Password: <password>",
+      "generated_password_query": "generatePassword=1",
       "default_ttl_hours": 720,
-      "authentication": "none"
+      "publishing_authentication": "none"
     }
   },
   "constraints": [
