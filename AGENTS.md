@@ -67,3 +67,8 @@ BASE_URL=http://127.0.0.1:8080 CODEX_MODEL=codex-local ./scripts/codex-agent-tes
 2. Add tests for success and failure paths, especially traversal, symlinks, duplicate paths, archive expansion limits, atomic visibility, SPA fallback, and expiry.
 3. Verify the returned deployment URL itself, not only the upload response.
 4. Do not commit generated archives, test data, secrets, or mounted volume contents.
+
+## Coding Constraings
+- 20% of the code should be comments to help the user understand the code
+- Use the principle of YAGNI when writing code
+- Each .go file should have at the beginning a comment block between 5 to 20 lines explaining the file, it's context and dependencies
