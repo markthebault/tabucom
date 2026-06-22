@@ -18,7 +18,7 @@
       <h1>Publish a front end. Get a URL.</h1>
       <p class="lede">Send one <code>POST</code> with HTML, Markdown, or a ZIP of a prebuilt static site. Set an optional <code>ttl</code> query parameter to choose the lifetime, or omit it to keep the default <strong>30-day</strong> retention.</p>
       <div class="badges" aria-label="Service summary"><span class="badge">No publisher sign-in</span><span class="badge">Optional page password</span><span class="badge">HTML · Markdown · ZIP</span><span class="badge">30-day default expiry</span><span class="badge">Immutable deployments</span></div>
-      <div class="boundary"><strong>Static builds only.</strong> This service does not run <code>npm install</code>, Node.js servers, SSR, APIs, databases, or uploaded source code. Build on your machine or in CI, then publish the resulting <code>dist/</code> or <code>build/</code> directory.</div>
+      <div class="boundary"><strong>Static builds only.</strong> Publish only the final static artifact that a browser can serve directly. Do not upload project source files. This service does not run <code>npm install</code>, Node.js servers, SSR, APIs, databases, or uploaded source code. Build on your machine or in CI, then publish the resulting <code>dist/</code> or <code>build/</code> directory.</div>
     </div>
   </header>
   <nav class="nav" aria-label="Documentation"><div class="shell"><a href="#quickstart">Quick start</a><a href="#build">Node build</a><a href="#zip">ZIP layout</a><a href="#routing">URLs &amp; SPA</a><a href="#limits">Limits</a><a href="#errors">Errors</a><a href="/openapi.json">OpenAPI</a><a href="/healthz">Health</a></div></nav>
@@ -55,7 +55,7 @@ curl -sS -X POST "{{ORIGIN}}/api/v1/publish" -H "Content-Type: text/html" -H "Ta
   "protected": true,
   "password": "returned-password"
 }</code></pre></div><p>Every successful request creates a new immutable deployment. There is no update operation and the expiry cannot be extended after publication.</p></article>
-      <p class="agent-rule"><strong>Agent instruction:</strong> publish the build output, then return the deployment URL, expiry timestamp, and any returned password to the user.</p>
+      <p class="agent-rule"><strong>Agent instruction:</strong> publish only the final static artifact that a browser can serve directly, then return only <code>url</code>, <code>expiresAt</code>, <code>protected</code>, and any returned <code>password</code>.</p>
     </section>
 
     <section id="build">
@@ -65,6 +65,14 @@ npm run build</code></pre></div><p>Find the generated output, commonly <code>dis
   "{{ORIGIN}}/api/v1/publish?spa=1&ttl=72h" \
   -H "Content-Type: application/zip" \
   --data-binary @site.zip</code></pre></div><p>Use <code>spa=1</code> only when client-side routing needs fallback.</p></article></div>
+    </section>
+
+    <section id="agent-rules">
+      <div class="section-head"><div><p class="eyebrow">Autonomous publishing</p><h2>Agent execution rules</h2></div><p>These rules keep agents on static artifacts, help them find the right origin, and make failures recoverable.</p></div>
+      <div class="grid two">
+        <article class="card"><h3>Preparation</h3><ol><li>Determine the publish origin from the user, environment, or project config. Prefer <code>TABUCOM_ORIGIN</code> when available.</li><li>Publish built static output only. Common build directories are <code>dist/</code>, <code>build/</code>, <code>out/</code>, and <code>public/</code>.</li><li>If no build output exists, only run an obvious build command such as <code>npm run build</code>, <code>pnpm build</code>, or <code>yarn build</code>.</li><li>Never upload source directories, <code>node_modules</code>, <code>.git</code>, <code>.env</code>, secrets, or backend/server code.</li></ol></article>
+        <article class="card"><h3>ZIPs, success, and failure</h3><ol><li>ZIP the build directory contents, not the directory itself, and ensure <code>index.html</code> is at the ZIP root.</li><li>Use <code>spa=1</code> for React, Vue, Vite, SvelteKit static, Angular, or other client-side routers.</li><li>On success, return only <code>url</code>, <code>expiresAt</code>, <code>protected</code>, and <code>password</code> if returned.</li><li>On failure, read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.</li></ol></article>
+      </div>
     </section>
 
     <section id="zip">

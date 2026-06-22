@@ -6,7 +6,7 @@
   "openapi_url": "/openapi.json",
   "llms_txt_url": "/llms.txt",
   "health_url": "/healthz",
-  "instructions": "Publish the build output, not project source. Send one POST to /api/v1/publish, optionally select a TTL and password protection, and return url, expiresAt, and any returned password to the user.",
+  "instructions": "Publish only the final static artifact that a browser can serve directly. Do not upload project source files. Determine the origin from the user, environment, or project config, preferring TABUCOM_ORIGIN when present. Publish built static output from directories such as dist/, build/, out/, or public/. If no build output exists, only run an obvious build command such as npm run build, pnpm build, or yarn build. For ZIP uploads, zip the build directory contents so index.html is at the ZIP root, use spa=1 for client-side routers, and on success return only url, expiresAt, protected, and password if returned. On failure, read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.",
   "capabilities": {
     "publish": {
       "method": "POST",
@@ -23,6 +23,7 @@
   "constraints": [
     "Static output only; uploaded code is not executed.",
     "ZIP archives must contain index.html at the root.",
+    "Never upload source directories, node_modules, .git, .env, secrets, or backend/server code.",
     "Always use the URL returned by the publish response."
   ]
 }

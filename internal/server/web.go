@@ -31,6 +31,11 @@ var webPaths = map[string]string{
 	"/openapi.json":           "web/openapi.json",
 	"/llms.txt":               "web/llms.txt",
 	"/.well-known/agent.json": "web/.well-known/agent.json",
+	"/agenticons/agenticon-claudecode.svg": "web/agenticons/agenticon-claudecode.svg",
+	"/agenticons/agenticon-codex.svg":      "web/agenticons/agenticon-codex.svg",
+	"/agenticons/agenticon-cursor.svg":     "web/agenticons/agenticon-cursor.svg",
+	"/agenticons/agenticon-hermes.svg":     "web/agenticons/agenticon-hermes.svg",
+	"/agenticons/agenticon-openclaw.svg":   "web/agenticons/agenticon-openclaw.svg",
 }
 
 // isWebPath reports whether a request addresses public discovery content.
