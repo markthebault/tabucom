@@ -27,10 +27,10 @@ var embeddedWeb embed.FS
 // webPaths is an allowlist rather than a direct filesystem mapping. New embedded
 // files do not become public until routing policy explicitly exposes them.
 var webPaths = map[string]string{
-	"/agents":                 "web/agents.html",
-	"/openapi.json":           "web/openapi.json",
-	"/llms.txt":               "web/llms.txt",
-	"/.well-known/agent.json": "web/.well-known/agent.json",
+	"/agents":                              "web/agents.html",
+	"/openapi.json":                        "web/openapi.json",
+	"/llms.txt":                            "web/llms.txt",
+	"/.well-known/agent.json":              "web/.well-known/agent.json",
 	"/agenticons/agenticon-claudecode.svg": "web/agenticons/agenticon-claudecode.svg",
 	"/agenticons/agenticon-codex.svg":      "web/agenticons/agenticon-codex.svg",
 	"/agenticons/agenticon-cursor.svg":     "web/agenticons/agenticon-cursor.svg",
