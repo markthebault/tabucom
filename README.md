@@ -123,6 +123,14 @@ go run ./cmd/tabucom
 make check
 ```
 
+Enable the pre-commit hook once per clone:
+
+```sh
+pre-commit install
+```
+
+The configured hook runs `make check`, which fails fast on `gofmt` drift, test failures, `go vet` issues, or invalid embedded JSON before a commit is created. Pull requests already run the same `make check` path in `.github/workflows/ci.yml`. To block merges until it passes, require the `test` status check in the repository branch protection rules for `main`.
+
 The opt-in S3 lifecycle test is compatible with RustFS:
 
 ```sh
