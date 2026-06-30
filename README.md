@@ -305,7 +305,8 @@ Requires Go 1.23 or newer.
 
 ```sh
 go run ./cmd/tabucom
-make check
+just check
+just test
 ```
 
 Useful local Docker commands are available through `just`:
