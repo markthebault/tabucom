@@ -22,6 +22,14 @@
     .copy-card:focus-visible{outline:2px solid #222;outline-offset:4px}
     .copy-text{font-size:clamp(1.05rem,2vw,1.3rem);line-height:1.2}
     .copy-icon{flex:none;width:30px;height:30px}
+    .token-panel{margin-top:18px;display:grid;gap:10px;max-width:560px}
+    .token-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .token-button{border:0;background:var(--accent);color:#fff;padding:10px 14px;font:700 .92rem/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer}
+    .token-button:focus-visible,.token-copy:focus-visible,.token-output:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .token-copy{border:1px solid rgba(17,17,17,.18);background:#fff;color:var(--ink);padding:9px 12px;font:700 .88rem/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer}
+    .token-ttl,.token-status,.token-help{margin:0;color:var(--muted);font-size:.84rem}
+    .token-help{line-height:1.45}
+    .token-output{width:100%;min-height:84px;resize:vertical;border:1px solid rgba(17,17,17,.18);padding:10px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);background:#fff}
     .agents-side{display:grid;align-content:start}
     .agent-logos{display:flex;flex-wrap:wrap;gap:26px}
     .agent-logo{display:grid;place-items:center;width:56px;height:56px;color:#111}
@@ -49,6 +57,7 @@
               <path d="M6 15H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"></path>
             </svg>
           </a>
+          {{TOKEN_UI}}
           <a class="agent-link" href="/agents" rel="help">Read the full agent guide <span aria-hidden="true">→</span></a>
         </div>
         <div class="agents-side">
@@ -130,6 +139,49 @@
           copyLink.innerHTML = originalHtml;
           copyLink.href = originalHref;
         }, 1600);
+      });
+
+      const tokenPanel = document.querySelector("[data-token-panel]");
+      if (!tokenPanel) return;
+      const tokenButton = tokenPanel.querySelector("[data-generate-token]");
+      const tokenResult = tokenPanel.querySelector("[data-token-result]");
+      const tokenOutput = tokenPanel.querySelector("[data-token-output]");
+      const tokenCopy = tokenPanel.querySelector("[data-copy-token]");
+      const tokenStatus = tokenPanel.querySelector("[data-token-status]");
+
+      tokenButton.addEventListener("click", async () => {
+        tokenStatus.textContent = "";
+        tokenButton.disabled = true;
+        try {
+          const response = await fetch("/api/v1/publish-token", { method: "POST", cache: "no-store" });
+          if (!response.ok) throw new Error("token failed");
+          const payload = await response.json();
+          tokenOutput.value = payload.token;
+          tokenResult.hidden = false;
+          tokenStatus.textContent = `Expires at ${new Date(payload.expiresAt).toLocaleString()}`;
+        } catch {
+          tokenStatus.textContent = "Could not generate token";
+        } finally {
+          tokenButton.disabled = false;
+        }
+      });
+
+      tokenCopy.addEventListener("click", async () => {
+        const token = tokenOutput.value;
+        if (!token) return;
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(token);
+          } else if (!legacyCopy(token)) {
+            throw new Error("copy failed");
+          }
+        } catch {
+          if (!legacyCopy(token)) {
+            tokenStatus.textContent = "Could not copy token";
+            return;
+          }
+        }
+        tokenStatus.textContent = "Token copied";
       });
     })();
   </script>

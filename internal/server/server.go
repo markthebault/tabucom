@@ -125,6 +125,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == "/healthz" && r.Method == http.MethodGet:
 		s.health(w)
+	case r.URL.Path == "/api/v1/publish-token" && r.Method == http.MethodPost && s.cfg.StatelessPublishTokensEnabled:
+		s.publishToken(w, r)
+	case r.URL.Path == "/api/v1/publish-token" && s.cfg.StatelessPublishTokensEnabled:
+		w.Header().Set("Allow", http.MethodPost)
+		apiError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST")
 	case r.URL.Path == "/api/v1/publish" && r.Method == http.MethodPost:
 		s.publish(w, r)
 	case r.URL.Path == "/api/v1/publish":

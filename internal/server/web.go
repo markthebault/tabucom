@@ -38,6 +38,35 @@ var webPaths = map[string]string{
 	"/agenticons/agenticon-openclaw.svg":   "web/agenticons/agenticon-openclaw.svg",
 }
 
+const tokenUI = `<div class="token-panel" data-token-panel>
+            <div class="token-row">
+              <button class="token-button" type="button" data-generate-token>Generate Publish Token</button>
+              <p class="token-ttl">Token TTL: 1 hour. Shown once after generation.</p>
+            </div>
+            <p class="token-help">This token lets your LLM publish a document to Tabucom. Generate one, copy it, and give it to the LLM when you ask it to publish.</p>
+            <div data-token-result hidden>
+              <textarea class="token-output" data-token-output readonly aria-label="Generated publish token"></textarea>
+              <div class="token-row">
+                <button class="token-copy" type="button" data-copy-token>Copy token</button>
+              </div>
+            </div>
+            <p class="token-status" data-token-status role="status"></p>
+          </div>`
+
+const llmsTokenInstructions = `
+## Publish tokens
+
+This Tabucom instance requires a stateless publish token.
+
+1. First generate a publish token from the Tabucom UI.
+2. Pass it to the LLM or harness as ` + "`TABUCOM_PUBLISH_TOKEN`" + `.
+3. Publish with ` + "`Authorization: Bearer $TABUCOM_PUBLISH_TOKEN`" + `.
+`
+
+const agentTokenInstructions = ` First generate a publish token from the Tabucom UI, pass it as TABUCOM_PUBLISH_TOKEN, and publish with Authorization: Bearer $TABUCOM_PUBLISH_TOKEN.`
+const openPublishSummary = `Publishing requires no authentication; individual deployments may use one visitor password.`
+const tokenPublishSummary = `Publishing requires a token generated from the Tabucom UI; individual deployments may also use one visitor password.`
+
 // isWebPath reports whether a request addresses public discovery content.
 func isWebPath(requestPath string) bool {
 	_, ok := webPaths[requestPath]
@@ -55,6 +84,7 @@ func (s *Server) landing(w http.ResponseWriter, r *http.Request) {
 
 	origin := html.EscapeString(s.requestBase(r))
 	data = bytes.ReplaceAll(data, []byte("{{ORIGIN}}"), []byte(origin))
+	data = s.applyFeaturePlaceholders(data)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
@@ -80,6 +110,7 @@ func (s *Server) serveWebFile(w http.ResponseWriter, r *http.Request) {
 		origin = html.EscapeString(origin)
 	}
 	data = bytes.ReplaceAll(data, []byte("{{ORIGIN}}"), []byte(origin))
+	data = s.applyFeaturePlaceholders(data)
 
 	if contentType := mime.TypeByExtension(path.Ext(name)); contentType != "" {
 		w.Header().Set("Content-Type", contentType)
@@ -89,4 +120,25 @@ func (s *Server) serveWebFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		_, _ = w.Write(data)
 	}
+}
+
+func (s *Server) applyFeaturePlaceholders(data []byte) []byte {
+	tokenHTML := ""
+	tokenInstructions := ""
+	agentInstructions := ""
+	publishingAuthentication := "none"
+	publishSummary := openPublishSummary
+	if s.cfg.StatelessPublishTokensEnabled {
+		tokenHTML = tokenUI
+		tokenInstructions = llmsTokenInstructions
+		agentInstructions = agentTokenInstructions
+		publishingAuthentication = "stateless_bearer_token"
+		publishSummary = tokenPublishSummary
+	}
+	data = bytes.ReplaceAll(data, []byte("{{TOKEN_UI}}"), []byte(tokenHTML))
+	data = bytes.ReplaceAll(data, []byte("\n{{PUBLISH_TOKEN_INSTRUCTIONS}}"), []byte(tokenInstructions))
+	data = bytes.ReplaceAll(data, []byte("{{AGENT_TOKEN_INSTRUCTIONS}}"), []byte(agentInstructions))
+	data = bytes.ReplaceAll(data, []byte("{{PUBLISHING_AUTHENTICATION}}"), []byte(publishingAuthentication))
+	data = bytes.ReplaceAll(data, []byte("{{PUBLISH_AUTH_SUMMARY}}"), []byte(publishSummary))
+	return data
 }
