@@ -305,16 +305,16 @@ Requires Go 1.23 or newer.
 
 ```sh
 go run ./cmd/tabucom
-just check
-just test
+make check
+make test
 ```
 
-Useful local Docker commands are available through `just`:
+Useful local Docker commands:
 
 ```sh
-just run
-just tokens
-just run-preview
+make run
+make run-tokens
+make run-preview
 ```
 
 Build from source with Docker Compose:

@@ -1,8 +1,8 @@
 repos:
   - repo: local
     hooks:
-      - id: just-check
-        name: just check
-        entry: just check
+      - id: make-check
+        name: make check
+        entry: make check
         language: system
         pass_filenames: false
