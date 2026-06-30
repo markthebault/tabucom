@@ -169,10 +169,17 @@
       tokenCopy.addEventListener("click", async () => {
         const token = tokenOutput.value;
         if (!token) return;
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(token);
-        } else {
-          legacyCopy(token);
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(token);
+          } else if (!legacyCopy(token)) {
+            throw new Error("copy failed");
+          }
+        } catch {
+          if (!legacyCopy(token)) {
+            tokenStatus.textContent = "Could not copy token";
+            return;
+          }
         }
         tokenStatus.textContent = "Token copied";
       });

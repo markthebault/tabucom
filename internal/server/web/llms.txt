@@ -1,6 +1,6 @@
 # Tabucom
 
-Publish HTML, Markdown, or a ZIP containing a prebuilt static site with one HTTP request. Publishing requires no authentication; individual deployments may use one visitor password. Every deployment is immutable and stops serving at the requested TTL, or after the default 30 days (720 hours) when no TTL is supplied.
+Publish HTML, Markdown, or a ZIP containing a prebuilt static site with one HTTP request. {{PUBLISH_AUTH_SUMMARY}} Every deployment is immutable and stops serving at the requested TTL, or after the default 30 days (720 hours) when no TTL is supplied.
 
 ## Agent behavior
 

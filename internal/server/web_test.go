@@ -93,6 +93,9 @@ func TestStatelessTokenInstructionsOnlyWhenEnabled(t *testing.T) {
 	if strings.Contains(disabledHome, "Generate Publish Token") || strings.Contains(disabledLLMS, "TABUCOM_PUBLISH_TOKEN") {
 		t.Fatal("disabled docs contain stateless token instructions")
 	}
+	if !strings.Contains(disabledLLMS, "Publishing requires no authentication") {
+		t.Fatal("disabled llms.txt no longer keeps open-publish guidance")
+	}
 	if !strings.Contains(disabledHome, `fetch("/llms.txt"`) {
 		t.Fatal("copy-instructions button no longer copies llms.txt")
 	}
@@ -112,6 +115,9 @@ func TestStatelessTokenInstructionsOnlyWhenEnabled(t *testing.T) {
 		if !strings.Contains(enabledLLMS, required) {
 			t.Fatalf("enabled llms.txt is missing %q", required)
 		}
+	}
+	if strings.Contains(enabledLLMS, "Publishing requires no authentication") {
+		t.Fatal("enabled llms.txt contains contradictory open-publish guidance")
 	}
 }
 
