@@ -67,6 +67,11 @@ func TestHealthAndDiscoveryDocuments(t *testing.T) {
 			if strings.Contains(body, "{{ORIGIN}}") {
 				t.Fatalf("origin placeholder remains in %s", test.url)
 			}
+			for _, stale := range []string{"tabucom.vps", "mark-thebault", "TABUCOM_ORIGIN", "publish.tools.company"} {
+				if strings.Contains(body, stale) {
+					t.Fatalf("response contains stale origin guidance %q", stale)
+				}
+			}
 			for _, required := range test.required {
 				if !strings.Contains(body, required) {
 					t.Errorf("response is missing %q", required)
@@ -79,6 +84,44 @@ func TestHealthAndDiscoveryDocuments(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStatelessTokenInstructionsOnlyWhenEnabled(t *testing.T) {
+	disabled := testServer(t, nil)
+	disabledHome := getBody(t, disabled, "http://docs.test/")
+	disabledLLMS := getBody(t, disabled, "http://docs.test/llms.txt")
+	if strings.Contains(disabledHome, "Generate Publish Token") || strings.Contains(disabledLLMS, "TABUCOM_PUBLISH_TOKEN") {
+		t.Fatal("disabled docs contain stateless token instructions")
+	}
+	if !strings.Contains(disabledHome, `fetch("/llms.txt"`) {
+		t.Fatal("copy-instructions button no longer copies llms.txt")
+	}
+
+	enabled := testServer(t, func(config *Config) {
+		config.StatelessPublishTokensEnabled = true
+		config.StatelessTokenSigningSecret = testSigningSecret
+	})
+	enabledHome := getBody(t, enabled, "http://docs.test/")
+	enabledLLMS := getBody(t, enabled, "http://docs.test/llms.txt")
+	for _, required := range []string{"Generate Publish Token", "Token TTL: 1 hour", "This token lets your LLM publish a document"} {
+		if !strings.Contains(enabledHome, required) {
+			t.Fatalf("enabled home is missing %q", required)
+		}
+	}
+	for _, required := range []string{"First generate a publish token", "TABUCOM_PUBLISH_TOKEN", "Authorization: Bearer $TABUCOM_PUBLISH_TOKEN"} {
+		if !strings.Contains(enabledLLMS, required) {
+			t.Fatalf("enabled llms.txt is missing %q", required)
+		}
+	}
+}
+
+func getBody(t *testing.T, server *Server, url string) string {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, url, nil)
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+	requireStatus(t, response, http.StatusOK)
+	return response.Body.String()
 }
 
 // TestDiscoveryHEADAndMethodPolicy confirms embedded assets support metadata-only

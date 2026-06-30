@@ -1,22 +1,24 @@
 # Tabucom
 
-Temporary static hosting in one small container. Publish HTML, Markdown, or a prebuilt ZIP and get an immutable URL that expires automatically—no accounts required.
+Tabucom is a small self-hosted service for publishing temporary static pages.
 
-Tabucom is intended for trusted internal networks. It serves uploaded files but never executes them or runs build commands.
+You send it HTML, Markdown, or a ZIP of an already-built website. It gives back
+a URL you can share. The page is immutable, can have an expiry time, and is
+deleted automatically later.
 
-## Features
+It is useful for:
 
-- One HTTP API and one persistent volume
-- HTML, Markdown, and prebuilt static-site ZIP uploads
-- Per-deployment TTLs with a 30-day default
-- Optional generated or custom single-password protection
-- Optional SPA fallback and wildcard subdomains
-- Defensive ZIP extraction and configurable resource limits
-- OpenAPI and agent-discovery endpoints included
+- sharing an HTML report with a team
+- asking an LLM to publish a quick preview
+- hosting temporary documentation, dashboards, or mockups
+- giving an organization a simple internal "paste and publish" service
 
-## Usage
+Tabucom does not run uploaded code, install packages, build projects, or execute
+server-side scripts. It only serves static files.
 
-Run the published image without cloning the repository:
+## Quick Start
+
+Run Tabucom locally with Docker:
 
 ```sh
 docker run --rm -p 8080:8080 \
@@ -25,15 +27,11 @@ docker run --rm -p 8080:8080 \
   ghcr.io/markthebault/tabucom:latest
 ```
 
-Tabucom is now available at <http://localhost:8080>. The named volume keeps deployments across container restarts.
+Open <http://localhost:8080>.
 
-To build the image from source instead:
+The named Docker volume keeps published pages across container restarts.
 
-```sh
-docker compose up --build
-```
-
-Publish a page:
+Publish a small HTML page:
 
 ```sh
 curl -sS -X POST http://localhost:8080/api/v1/publish \
@@ -41,78 +39,265 @@ curl -sS -X POST http://localhost:8080/api/v1/publish \
   --data-binary '<!doctype html><title>Hello</title><h1>Hello from Tabucom</h1>'
 ```
 
-The `201` response includes the deployment's immutable `url`, `expiresAt`, and protection state:
+The response contains the URL to open:
 
 ```json
 {
-  "id": "…",
-  "createdAt": "…",
-  "expiresAt": "…",
+  "id": "...",
+  "url": "http://localhost:8080/p/.../",
+  "createdAt": "...",
+  "expiresAt": "...",
   "files": 1,
   "bytes": 62,
-  "protected": false,
   "spa": false,
-  "url": "http://localhost:8080/p/…/"
+  "protected": false
 }
 ```
 
-Use `Content-Type: text/markdown` for Markdown, or upload an `application/zip` archive containing `index.html` at its root. Publish only the final static artifact that a browser can serve directly. Do not upload project source files. Add `?spa=1` for client-side routing and `?ttl=72h` for a custom lifetime.
+## Run On A VPS
 
-Add `-H 'Tabucom-Password: correct horse'` to set a custom 8–128 character printable ASCII password, or add `?generatePassword=1` to generate one. Protected responses include `"protected": true` and `"password"`; visitors enter that password in Tabucom's form and remain unlocked until expiry. Do not combine the two options. Use HTTPS in production so passwords and cookies are encrypted in transit.
+For a small organization, the usual setup is:
 
-## Agent execution rules
+1. Run Tabucom on a VPS with Docker.
+2. Put a reverse proxy in front of it, such as Caddy, Traefik, nginx, or your
+   platform's ingress.
+3. Set `PUBLIC_API_URL` to the public HTTPS URL users will open.
+4. Enable publish tokens if people or LLMs outside a trusted network can reach
+   the service.
 
-1. Determine the publish origin from the user, environment, or project config. Prefer `TABUCOM_ORIGIN` when available.
-2. Always publish built static output only. Common build directories are `dist/`, `build/`, `out/`, and `public/`.
-3. If no build output exists, run the project build command only when obvious, such as `npm run build`, `pnpm build`, or `yarn build`.
-4. For ZIP publishing, zip the contents of the build directory rather than the directory itself, ensure `index.html` is at the ZIP root, and use `spa=1` for React, Vue, Vite, SvelteKit static, Angular, or other client-side routers.
-5. Never upload source code directories, `node_modules`, `.git`, secrets, `.env`, or backend/server code.
-6. On success, return only `url`, `expiresAt`, `password` if returned, and `protected`.
-7. On failure, read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
+Example:
+
+```sh
+docker run -d --name tabucom \
+  --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  -e PUBLIC_API_URL=https://tabucom.example.com \
+  -v tabucom-data:/data \
+  ghcr.io/markthebault/tabucom:latest
+```
+
+Your reverse proxy should send `https://tabucom.example.com` traffic to
+`http://127.0.0.1:8080`.
+
+`PUBLIC_API_URL` matters because Tabucom uses it in API responses and in the
+instructions copied from the home page. If you run locally, use
+`http://localhost:8080`. If you run on a VPS, use your real HTTPS URL.
+
+## Publish Tokens
+
+By default, publishing is open to anyone who can reach the service. That is fine
+for a private local machine or a trusted internal network.
+
+If Tabucom is exposed on a VPS or used by many people, enable stateless publish
+tokens:
+
+```sh
+docker run -d --name tabucom \
+  --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  -e PUBLIC_API_URL=https://tabucom.example.com \
+  -e STATELESS_PUBLISH_TOKENS_ENABLED=true \
+  -e STATELESS_TOKEN_SIGNING_SECRET='change-this-to-a-long-random-secret-value' \
+  -v tabucom-data:/data \
+  ghcr.io/markthebault/tabucom:latest
+```
+
+When tokens are enabled:
+
+- the home page shows a "Generate Publish Token" button
+- a user can copy the token and give it to an LLM
+- the LLM can then publish documents to Tabucom
+- generated tokens are not stored in a database
+- expired or invalid tokens are rejected
+
+Use a signing secret of at least 32 characters. A password manager is a good way
+to generate it.
+
+If you publish with a script while tokens are enabled, include this header:
+
+```sh
+-H "Authorization: Bearer $TABUCOM_PUBLISH_TOKEN"
+```
+
+## Publishing Content
+
+Tabucom accepts three upload types.
+
+HTML:
+
+```sh
+curl -sS -X POST https://tabucom.example.com/api/v1/publish \
+  -H 'Content-Type: text/html' \
+  --data-binary @index.html
+```
+
+Markdown:
+
+```sh
+curl -sS -X POST https://tabucom.example.com/api/v1/publish \
+  -H 'Content-Type: text/markdown' \
+  --data-binary @report.md
+```
+
+ZIP of a built static site:
+
+```sh
+(cd dist && zip -qr ../site.zip .)
+
+curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?spa=1' \
+  -H 'Content-Type: application/zip' \
+  --data-binary @site.zip
+```
+
+The ZIP must contain `index.html` at its root:
+
+```text
+site.zip
+|-- index.html
+|-- assets/
+|   |-- app.js
+|   `-- app.css
+`-- images/logo.svg
+```
+
+Do not upload project source code. Build first, then publish the output folder,
+usually `dist/`, `build/`, `out/`, or `public/`.
+
+## Useful Options
+
+Set a shorter or longer lifetime:
+
+```sh
+curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?ttl=72h' \
+  -H 'Content-Type: text/html' \
+  --data-binary @index.html
+```
+
+Enable single-page-app fallback for React, Vue, Angular, SvelteKit static sites,
+or other client-side routers:
+
+```sh
+curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?spa=1' \
+  -H 'Content-Type: application/zip' \
+  --data-binary @site.zip
+```
+
+Add a visitor password:
+
+```sh
+curl -sS -X POST https://tabucom.example.com/api/v1/publish \
+  -H 'Content-Type: text/html' \
+  -H 'Tabucom-Password: correct horse' \
+  --data-binary @index.html
+```
+
+Or let Tabucom generate one:
+
+```sh
+curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?generatePassword=1' \
+  -H 'Content-Type: text/html' \
+  --data-binary @index.html
+```
+
+Visitor passwords protect the published page. They do not protect the publish
+API. Use publish tokens for that.
+
+## Use With An LLM
+
+Open the Tabucom home page and click "Copy setup instructions for my agent".
+
+If publish tokens are enabled, first click "Generate Publish Token", copy the
+token, and give it to the LLM when you ask it to publish.
+
+The LLM instructions tell the agent to:
+
+1. publish only built static output
+2. avoid source code, secrets, `.env`, `.git`, and `node_modules`
+3. use the URL served by your Tabucom instance
+4. return only the published `url`, `expiresAt`, `protected`, and password when
+   one is returned
+
+The same instructions are also available at:
+
+- `/llms.txt`
+- `/agents`
+- `/.well-known/agent.json`
+- `/openapi.json`
 
 ## Configuration
 
-The most commonly used environment variables are:
+Most installations only need `PUBLIC_API_URL`, `DATA_DIR`, and optionally publish
+tokens.
 
-| Variable | Default | Description |
+| Variable | Default | What it does |
 | --- | --- | --- |
-| `PUBLIC_API_URL` | request origin | Public URL used in API responses |
-| `DATA_DIR` | `./data` | Local deployment storage and upload staging directory |
-| `S3_BUCKET` | unset | Enables S3-compatible storage when set; otherwise `DATA_DIR` is used |
-| `S3_ENDPOINT` | AWS default | Optional endpoint for Cloudflare R2, RustFS, or another S3-compatible service |
+| `PUBLIC_API_URL` | request origin | Public URL used in responses and generated instructions |
+| `DATA_DIR` | `./data` | Local storage directory for deployments |
+| `TTL` | `720h` | Default lifetime when a request does not set `ttl` |
+| `STATELESS_PUBLISH_TOKENS_ENABLED` | `false` | Require a publish token for `POST /api/v1/publish` |
+| `STATELESS_TOKEN_SIGNING_SECRET` | unset | Secret used to sign publish tokens |
+| `PREVIEW_DOMAIN` | empty | Optional wildcard domain for isolated preview URLs |
+| `MAX_UPLOAD_BYTES` | `104857600` | Maximum upload size |
+| `MAX_EXPANDED_BYTES` | `524288000` | Maximum expanded ZIP size |
+| `MAX_FILES` | `10000` | Maximum number of ZIP entries |
+| `RATE_LIMIT_PER_HOUR` | `60` | Publish requests allowed per network peer |
+
+S3-compatible storage is optional:
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `S3_BUCKET` | unset | Enables S3-compatible storage when set |
+| `S3_ENDPOINT` | AWS default | Optional endpoint for R2, RustFS, MinIO, or another S3-compatible service |
 | `S3_REGION` | `us-east-1` | Signing region; use `auto` for Cloudflare R2 |
 | `S3_PREFIX` | unset | Optional object-key prefix |
-| `S3_PATH_STYLE` | `false` | Use path-style bucket URLs; commonly required by local endpoints |
-| `TTL` | `720h` | Default deployment lifetime |
-| `PREVIEW_DOMAIN` | empty | Wildcard domain for isolated preview origins |
-| `MAX_UPLOAD_BYTES` | `104857600` | Maximum request size |
-| `MAX_EXPANDED_BYTES` | `524288000` | Maximum expanded ZIP size |
+| `S3_PATH_STYLE` | `false` | Use path-style bucket URLs |
 
-See the hosted `/agents` guide or `/openapi.json` endpoint for the complete API and configuration limits.
+If `S3_BUCKET` is not set, Tabucom uses local Docker volume storage.
 
-Set `S3_BUCKET` to store deployments in AWS S3, Cloudflare R2, RustFS, or another S3-compatible service. Credentials use the standard AWS environment variables or credential chain. For R2, set `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com` and `S3_REGION=auto`. If `S3_BUCKET` is unset, local storage is unchanged.
+## Optional Preview Subdomains
 
-## DNS and TLS
+By default, deployments are served under the main domain:
 
-For isolated preview subdomains, choose a base hostname such as `preview.example.com` and point both it and its wildcard to the Tabucom server:
+```text
+https://tabucom.example.com/p/{id}/
+```
+
+You can also configure a wildcard preview domain:
+
+```text
+https://{id}.preview.example.com/
+```
+
+This gives each deployment its own browser origin, which is better for untrusted
+HTML and JavaScript.
+
+To use it, point both the preview domain and its wildcard to the Tabucom server:
 
 ```dns
 preview.example.com    A      192.0.2.10
 *.preview.example.com  CNAME  preview.example.com.
 ```
 
-Use an `AAAA` record as well when the server has IPv6. The wildcard may instead point directly to the server with `A` and `AAAA` records.
-
-Configure Tabucom with:
+Then configure:
 
 ```env
 PUBLIC_API_URL=https://preview.example.com
 PREVIEW_DOMAIN=preview.example.com
 ```
 
-The reverse proxy must route both `preview.example.com` and `*.preview.example.com` to Tabucom while preserving the request host. TLS must cover both names, using either one certificate with both names or separate exact and wildcard certificates.
+Your reverse proxy must route both `preview.example.com` and
+`*.preview.example.com` to Tabucom. TLS must cover both names.
 
-Wildcard certificates require DNS-01 validation. Use a DNS provider supported by your certificate resolver, or automate the required `_acme-challenge` TXT records. If a CDN or DNS proxy cannot issue or serve certificates for these wildcard hosts, leave the records DNS-only and terminate TLS on your server.
+## Safety Notes
+
+- Put Tabucom behind HTTPS before using passwords or publish tokens.
+- Enable publish tokens when the publish API is reachable outside a trusted
+  network.
+- Published JavaScript runs in visitors' browsers.
+- Path-mode deployments share the same browser origin as Tabucom itself.
+- Use `PREVIEW_DOMAIN` for stronger browser isolation.
+- ZIP uploads are checked for traversal, symlinks, duplicate paths, unsafe file
+  types, missing root `index.html`, and archive expansion limits.
 
 ## Development
 
@@ -123,26 +308,20 @@ go run ./cmd/tabucom
 make check
 ```
 
-Enable the pre-commit hook once per clone:
+Useful local Docker commands are available through `just`:
 
 ```sh
-pre-commit install
+just run
+just tokens
+just run-preview
 ```
 
-The configured hook runs `make check`, which fails fast on `gofmt` drift, test failures, `go vet` issues, or invalid embedded JSON before a commit is created. Pull requests already run the same `make check` path in `.github/workflows/ci.yml`. To block merges until it passes, require the `test` status check in the repository branch protection rules for `main`.
-
-The opt-in S3 lifecycle test is compatible with RustFS:
+Build from source with Docker Compose:
 
 ```sh
-docker run --rm -d --name tabucom-rustfs -p 19000:9000 rustfs/rustfs:latest
-AWS_ACCESS_KEY_ID=rustfsadmin AWS_SECRET_ACCESS_KEY=rustfsadmin \
-  AWS_EC2_METADATA_DISABLED=true S3_TEST_ENDPOINT=http://127.0.0.1:19000 \
-  go test ./internal/server -run TestRustFSLifecycle -v
-docker stop tabucom-rustfs
+docker compose up --build
 ```
 
-Read [the architecture guide](docs/architecture.md) for the request lifecycle, storage model, and security boundaries. Contributor and integration-test commands are in [AGENTS.md](AGENTS.md).
-
-## Security
-
-Publishing has no application-level authentication, so put Tabucom behind a VPN, SSO, or trusted ingress when publishing must be restricted. Per-deployment passwords protect visitor access, not the publish API. Uploaded JavaScript runs in visitors' browsers. Configure `PREVIEW_DOMAIN` with wildcard DNS and TLS when deployments require origin isolation.
+Read [the architecture guide](docs/architecture.md) for the request lifecycle,
+storage model, and security boundaries. Contributor and integration-test
+commands are in [AGENTS.md](AGENTS.md).

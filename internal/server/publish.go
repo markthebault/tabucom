@@ -79,6 +79,12 @@ type rateBucket struct {
 // publish coordinates validation, staging, and atomic commit. No deployment path
 // is visible until every input check and metadata write has succeeded.
 func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
+	if err := s.requirePublishToken(r); err != nil {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="tabucom-publish"`)
+		apiError(w, http.StatusUnauthorized, "unauthorized", "valid publish bearer token required")
+		return
+	}
+
 	if retryAfter, allowed := s.allowPublish(r); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		apiError(w, http.StatusTooManyRequests, "rate_limited", "publish rate limit exceeded")

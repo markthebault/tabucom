@@ -49,6 +49,10 @@ type Config struct {
 	MaxFiles int
 	// RateLimitPerHour limits publications per remote address in this process.
 	RateLimitPerHour int
+	// StatelessPublishTokensEnabled requires signed bearer tokens on publishing.
+	StatelessPublishTokensEnabled bool
+	// StatelessTokenSigningSecret signs stateless publish tokens when enabled.
+	StatelessTokenSigningSecret string
 
 	// Now is injectable for deterministic expiry and rate-limit tests.
 	Now func() time.Time
@@ -133,6 +137,14 @@ func ConfigFromEnv() (Config, error) {
 	if cfg.RateLimitPerHour, err = intFromEnv("RATE_LIMIT_PER_HOUR", cfg.RateLimitPerHour); err != nil {
 		return cfg, err
 	}
+	if value := os.Getenv("STATELESS_PUBLISH_TOKENS_ENABLED"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return cfg, errors.New("STATELESS_PUBLISH_TOKENS_ENABLED must be true or false")
+		}
+		cfg.StatelessPublishTokensEnabled = parsed
+	}
+	cfg.StatelessTokenSigningSecret = os.Getenv("STATELESS_TOKEN_SIGNING_SECRET")
 
 	return cfg, cfg.validate()
 }
@@ -187,6 +199,9 @@ func (cfg Config) validate() error {
 	}
 	if cfg.S3Bucket != "" && cfg.S3Region == "" {
 		return errors.New("S3_REGION must not be empty when S3_BUCKET is set")
+	}
+	if cfg.StatelessPublishTokensEnabled && len(cfg.StatelessTokenSigningSecret) < 32 {
+		return errors.New("STATELESS_TOKEN_SIGNING_SECRET must be at least 32 bytes when stateless publish tokens are enabled")
 	}
 	return nil
 }
