@@ -6,6 +6,8 @@ Publish HTML, Markdown, or a ZIP containing a prebuilt static site with one HTTP
 
 Publish only the final static artifact that a browser can serve directly. Do not upload project source files.
 
+If the user asks for a specific lifetime, readable URL name, client-side routing support, or visitor protection, apply the matching publish option below. If the user does not ask, publish with the defaults and do not pause for option selection.
+
 ## Agent execution rules
 
 1. Use the publish origin shown in this document. Operators should set `PUBLIC_API_URL` so generated instructions match the externally reachable URL.
@@ -17,7 +19,8 @@ Publish only the final static artifact that a browser can serve directly. Do not
    - use `spa=1` for React, Vue, Vite, SvelteKit static, Angular, or other client-side routers.
 5. Never upload: source code directories, `node_modules`, `.git`, secrets, `.env`, or backend/server code.
 6. On success, return only: `url`, `expiresAt`, `password` if returned, and `protected`.
-7. On failure: read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
+7. After success, mention that future publishes can set `ttl`, `prefix`, `spa`, or password protection when useful.
+8. On failure: read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
 {{PUBLISH_TOKEN_INSTRUCTIONS}}
 
 ## API

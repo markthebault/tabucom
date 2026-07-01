@@ -34,6 +34,9 @@ func TestHealthAndDiscoveryDocuments(t *testing.T) {
 				"HTML",
 				"Markdown",
 				"immutable URL",
+				"Available publish options",
+				"prefix",
+				"password",
 				`href="/agents"`,
 			},
 			absent: []string{"<nav", "<pre", "<table", "POST</span>"},
@@ -52,7 +55,13 @@ func TestHealthAndDiscoveryDocuments(t *testing.T) {
 			},
 		},
 		{url: "http://docs.test/openapi.json"},
-		{url: "http://docs.test/llms.txt"},
+		{
+			url: "http://docs.test/llms.txt",
+			required: []string{
+				"publish with the defaults",
+				"future publishes can set `ttl`, `prefix`, `spa`, or password protection",
+			},
+		},
 		{url: "http://docs.test/.well-known/agent.json"},
 	}
 
