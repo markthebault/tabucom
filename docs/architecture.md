@@ -24,11 +24,11 @@ The executable in `cmd/tabucom` loads configuration, creates the server, and man
 ## Publish lifecycle
 
 1. `POST /api/v1/publish` is rate-limited by the request's network peer.
-2. The server validates `Content-Type`, `spa`, `ttl`, optional password settings, and request-size limits.
-3. A random UUID and a temporary directory are created under `DATA_DIR/sites`.
+2. The server validates `Content-Type`, `spa`, `ttl`, optional `prefix`, optional password settings, and request-size limits.
+3. A deployment ID and a temporary directory are created under `DATA_DIR/sites`. IDs are UUIDs by default, or `prefix-<random>` when a valid prefix is supplied.
 4. HTML is streamed to `index.html`, Markdown is rendered to escaped HTML, or a ZIP is defensively extracted. Every input must produce a regular root `index.html`.
 5. The server writes private metadata containing creation time, expiry, file count, byte count, SPA behavior, and optional Argon2id password data. Plaintext passwords are never stored.
-6. The staging directory is renamed to its final UUID. Because both paths share a parent filesystem, a deployment becomes visible atomically.
+6. The staging directory is renamed to its final ID. Because both paths share a parent filesystem, a deployment becomes visible atomically.
 7. The API returns `201` with `url`, `expiresAt`, `protected`, and the password when protection was requested.
 
 Failures remove the staging directory, so visitors cannot observe partial deployments. Published directories are never modified.
@@ -39,7 +39,7 @@ Failures remove the staging directory, so visitors cannot observe partial deploy
 DATA_DIR/
 └── sites/
     ├── .staging-*/           temporary, never served
-    └── <deployment-uuid>/
+    └── <deployment-id>/
         ├── .site.json        private metadata
         ├── index.html
         └── ...               uploaded static assets

@@ -27,6 +27,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 type s3Storage struct {
@@ -70,7 +71,7 @@ func (storage *s3Storage) key(parts ...string) string {
 	return path.Join(all...)
 }
 
-// siteKey keeps every immutable deployment below sites/<uuid>/.
+// siteKey keeps every immutable deployment below sites/<id>/.
 func (storage *s3Storage) siteKey(id, name string) string {
 	return storage.key("sites", id, name)
 }
@@ -160,6 +161,24 @@ func (storage *s3Storage) metadata(id string) (Metadata, error) {
 	defer object.Body.Close()
 	err = json.NewDecoder(object.Body).Decode(&metadata)
 	return metadata, err
+}
+
+func (storage *s3Storage) siteExists(id string) (bool, error) {
+	_, err := storage.client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: aws.String(storage.bucket), Key: aws.String(storage.siteKey(id, metadataName)),
+	})
+	if err == nil {
+		return true, nil
+	}
+	var notFound *types.NotFound
+	if errors.As(err, &notFound) {
+		return false, nil
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && (apiErr.ErrorCode() == "NotFound" || apiErr.ErrorCode() == "NoSuchKey" || apiErr.ErrorCode() == "404") {
+		return false, nil
+	}
+	return false, err
 }
 
 // object opens one stored response body. The caller must close Body.

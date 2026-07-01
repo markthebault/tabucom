@@ -34,6 +34,10 @@
     .agent-logos{display:flex;flex-wrap:wrap;gap:26px}
     .agent-logo{display:grid;place-items:center;width:56px;height:56px;color:#111}
     .agent-logo svg,.agent-logo img{width:44px;height:44px;display:block;object-fit:contain}
+    .options-list{display:grid;gap:8px;margin:18px 0 0;padding:0;list-style:none;color:var(--muted);font-size:.92rem}
+    .options-list li{display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px;align-items:start}
+    .options-list li::before{content:"";width:6px;height:6px;margin-top:.68em;background:var(--accent)}
+    .options-list code{color:var(--ink);font-size:.9em}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     .agent-link{display:inline-block;margin-top:18px;color:var(--muted);font-size:.82rem;text-decoration-color:color-mix(in srgb,var(--muted) 40%,transparent);text-underline-offset:4px}
     .agent-link:hover,.agent-link:focus-visible{color:var(--accent);text-decoration-color:currentColor}
@@ -61,7 +65,14 @@
           <a class="agent-link" href="/agents" rel="help">Read the full agent guide <span aria-hidden="true">→</span></a>
         </div>
         <div class="agents-side">
-          <p class="agent-kicker">Works with every agent</p>
+          <p class="agent-kicker">Available publish options</p>
+          <ul class="options-list">
+            <li><span><code>ttl</code> sets a custom expiry, such as 2 hours or 7 days.</span></li>
+            <li><span><code>prefix</code> adds a readable URL ID with a random suffix.</span></li>
+            <li><span><code>spa</code> keeps React/Vue app routes working after refresh.</span></li>
+            <li><span><code>password</code> protects the page for visitors.</span></li>
+          </ul>
+          <p class="agent-kicker" style="margin-top:24px">Works with every agent</p>
           <div class="agent-logos" aria-label="Compatible with common agents">
             <span class="agent-logo" title="Claude Code">
               <img src="/agenticons/agenticon-claudecode.svg" alt="Claude Code">

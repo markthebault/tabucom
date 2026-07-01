@@ -25,6 +25,8 @@ import (
 
 var errEmptyBody = errors.New("request body is empty")
 
+const idAllocationAttempts = 16
+
 // Metadata is persisted with each deployment and returned to publishing clients.
 // The file count and byte count describe expanded, servable content rather than
 // the transport encoding of the upload.
@@ -59,6 +61,7 @@ type publishOptions struct {
 	contentType      string
 	spa              bool
 	ttl              time.Duration
+	prefix           string
 	password         string
 	generatePassword bool
 }
@@ -104,7 +107,7 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := randomID()
+	id, err := s.allocateID(options.prefix)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, "internal_error", "could not allocate site ID")
 		return
@@ -197,6 +200,10 @@ func (s *Server) parsePublishOptions(r *http.Request) (publishOptions, error) {
 	if err != nil {
 		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_ttl", "ttl must be a positive duration such as 72h or 90m"}
 	}
+	prefix := r.URL.Query().Get("prefix")
+	if prefix != "" && !validPrefix(prefix) {
+		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_prefix", "prefix must be 1 to 46 lowercase letters, numbers, or hyphens, starting and ending with a letter or number"}
+	}
 	generatePassword, err := parseBool(r.URL.Query().Get("generatePassword"))
 	if err != nil {
 		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_generate_password", "generatePassword must be 1, 0, true, or false"}
@@ -210,7 +217,7 @@ func (s *Server) parsePublishOptions(r *http.Request) (publishOptions, error) {
 		return publishOptions{}, &publishError{http.StatusBadRequest, "invalid_password", "password must be 8 to 128 printable ASCII characters"}
 	}
 
-	return publishOptions{contentType: contentType, spa: spa, ttl: ttl, password: password, generatePassword: generatePassword}, nil
+	return publishOptions{contentType: contentType, spa: spa, ttl: ttl, prefix: prefix, password: password, generatePassword: generatePassword}, nil
 }
 
 func validPassword(password string) bool {
@@ -231,6 +238,40 @@ func randomSecret(bytes int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(value), nil
+}
+
+func (s *Server) allocateID(prefix string) (string, error) {
+	for range idAllocationAttempts {
+		id, err := randomID()
+		if prefix != "" {
+			id, err = randomPrefixedID(prefix)
+		}
+		if err != nil {
+			return "", err
+		}
+		exists, err := s.siteExists(id)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			return id, nil
+		}
+	}
+	return "", errors.New("could not allocate unique site ID")
+}
+
+func (s *Server) siteExists(id string) (bool, error) {
+	if s.s3 != nil {
+		return s.s3.siteExists(id)
+	}
+	_, err := os.Stat(filepath.Join(s.sites, id))
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // supportedContentType is kept separate so media-type policy has one definition.

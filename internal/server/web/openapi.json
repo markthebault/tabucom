@@ -29,6 +29,13 @@
             "schema": {"type": "string", "examples": ["72h", "90m", "168h"]}
           },
           {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "description": "Optional readable ID prefix. The final deployment ID is prefix plus a random 16-hex-character suffix. Prefixes must be 1 to 46 lowercase letters, numbers, or hyphens, and must start and end with a letter or number.",
+            "schema": {"type": "string", "minLength": 1, "maxLength": 46, "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$", "examples": ["my-super-website"]}
+          },
+          {
             "name": "generatePassword",
             "in": "query",
             "required": false,
@@ -54,7 +61,7 @@
         "responses": {
           "201": {
             "description": "Published",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"019f2a56-7f0d-73c3-89ef-8f0d8c499f26","url":"{{ORIGIN}}/p/019f2a56-7f0d-73c3-89ef-8f0d8c499f26/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-06-22T14:30:00Z","files":37,"bytes":1842032,"spa":true,"protected":true,"password":"generated-or-custom-password"}}}
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublishResponse"}, "example": {"id":"my-super-website-1a2b3c4d5e6f7890","url":"{{ORIGIN}}/p/my-super-website-1a2b3c4d5e6f7890/","createdAt":"2026-06-19T14:30:00Z","expiresAt":"2026-06-22T14:30:00Z","files":37,"bytes":1842032,"spa":true,"protected":true,"password":"generated-or-custom-password"}}}
           },
           "401": {"$ref": "#/components/responses/ClientError"},
           "400": {"$ref": "#/components/responses/ClientError"},
@@ -78,7 +85,7 @@
         "operationId": "getPublishedFile",
         "summary": "Read a file from a path-mode deployment",
         "parameters": [
-          {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
+          {"name":"id","in":"path","required":true,"schema":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?-[0-9a-f]{16})$"}},
           {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."}
         ],
         "responses": {"200":{"description":"Published static content"},"401":{"description":"Password form for a protected deployment"},"404":{"description":"Deployment not found, expired, or missing the requested file"}}
@@ -87,7 +94,7 @@
         "operationId": "unlockPublishedSite",
         "summary": "Unlock a password-protected deployment in a browser",
         "parameters": [
-          {"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},
+          {"name":"id","in":"path","required":true,"schema":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?-[0-9a-f]{16})$"}},
           {"name":"path","in":"path","required":true,"schema":{"type":"string"}}
         ],
         "requestBody": {"required":true,"content":{"application/x-www-form-urlencoded":{"schema":{"type":"object","required":["password"],"properties":{"password":{"type":"string"}}}}}},
@@ -97,8 +104,8 @@
   },
   "components": {
     "schemas": {
-      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa","protected"],"properties":{"id":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"CreatedAt plus the requested ttl, or 720 hours when ttl is omitted."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"},"protected":{"type":"boolean"},"password":{"type":"string","description":"Present for protected deployments, including custom-password requests."}}},
-      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["empty_body","invalid_archive","invalid_generate_password","invalid_password","invalid_spa","invalid_ttl","internal_error","method_not_allowed","missing_index","rate_limited","service_unavailable","too_many_files","unauthorized","unsupported_media_type","upload_too_large"]},"message":{"type":"string"}}}}}
+      "PublishResponse": {"type":"object","required":["id","url","createdAt","expiresAt","files","bytes","spa","protected"],"properties":{"id":{"type":"string","description":"A UUID by default, or prefix plus a random 16-hex-character suffix when prefix is supplied."},"url":{"type":"string","format":"uri"},"createdAt":{"type":"string","format":"date-time"},"expiresAt":{"type":"string","format":"date-time","description":"CreatedAt plus the requested ttl, or 720 hours when ttl is omitted."},"files":{"type":"integer","minimum":1},"bytes":{"type":"integer","minimum":0},"spa":{"type":"boolean"},"protected":{"type":"boolean"},"password":{"type":"string","description":"Present for protected deployments, including custom-password requests."}}},
+      "Error": {"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message"],"properties":{"code":{"type":"string","enum":["empty_body","invalid_archive","invalid_generate_password","invalid_password","invalid_prefix","invalid_spa","invalid_ttl","internal_error","method_not_allowed","missing_index","rate_limited","service_unavailable","too_many_files","unauthorized","unsupported_media_type","upload_too_large"]},"message":{"type":"string"}}}}}
     },
     "responses": {
       "ClientError": {"description":"The upload was rejected", "content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},

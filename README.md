@@ -182,6 +182,17 @@ curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?spa=1' \
   --data-binary @site.zip
 ```
 
+Add a readable ID prefix:
+
+```sh
+curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?prefix=my-super-website' \
+  -H 'Content-Type: text/html' \
+  --data-binary @index.html
+```
+
+The returned ID still ends with a random suffix, such as
+`my-super-website-1a2b3c4d5e6f7890`, so repeated prefixes can coexist.
+
 Add a visitor password:
 
 ```sh
