@@ -23,6 +23,10 @@ import (
 )
 
 const metadataName = ".site.json"
+const prefixedIDSuffixBytes = 8
+const prefixedIDSuffixHexLength = prefixedIDSuffixBytes * 2
+const maxDeploymentIDLength = 63
+const maxPrefixLength = maxDeploymentIDLength - 1 - prefixedIDSuffixHexLength
 
 // pathSiteRequest recognizes only valid deployment IDs under /p/{id}/. Invalid
 // IDs deliberately fall through to the normal 404 path instead of touching disk.
@@ -292,8 +296,20 @@ func randomID() (string, error) {
 	return encoded[0:8] + "-" + encoded[8:12] + "-" + encoded[12:16] + "-" + encoded[16:20] + "-" + encoded[20:], nil
 }
 
-// validID accepts exactly the lowercase UUID representation generated above.
+func randomPrefixedID(prefix string) (string, error) {
+	var bytes [prefixedIDSuffixBytes]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return "", err
+	}
+	return prefix + "-" + hex.EncodeToString(bytes[:]), nil
+}
+
+// validID accepts the legacy UUID form and the optional prefix-short-suffix form.
 func validID(value string) bool {
+	return validUUIDID(value) || validPrefixedID(value)
+}
+
+func validUUIDID(value string) bool {
 	if len(value) != 36 {
 		return false
 	}
@@ -307,6 +323,36 @@ func validID(value string) bool {
 		if !strings.ContainsRune("0123456789abcdef", character) {
 			return false
 		}
+	}
+	return true
+}
+
+func validPrefixedID(value string) bool {
+	index := strings.LastIndex(value, "-")
+	if index <= 0 || index == len(value)-1 {
+		return false
+	}
+	suffix := value[index+1:]
+	if !validPrefix(value[:index]) || len(suffix) != prefixedIDSuffixHexLength {
+		return false
+	}
+	for _, character := range suffix {
+		if !strings.ContainsRune("0123456789abcdef", character) {
+			return false
+		}
+	}
+	return true
+}
+
+func validPrefix(value string) bool {
+	if len(value) == 0 || len(value) > maxPrefixLength || value[0] == '-' || value[len(value)-1] == '-' {
+		return false
+	}
+	for _, character := range value {
+		if character == '-' || character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			continue
+		}
+		return false
 	}
 	return true
 }

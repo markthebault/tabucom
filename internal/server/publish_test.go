@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,6 +78,28 @@ func TestPublishCustomTTL(t *testing.T) {
 	}
 }
 
+func TestPublishPrefix(t *testing.T) {
+	server := testServer(t, nil)
+	published, response := publish(t, server, "text/html", []byte("<h1>Hello</h1>"), "?prefix=my-super-website")
+	requireStatus(t, response, http.StatusCreated)
+
+	if !strings.HasPrefix(published.ID, "my-super-website-") || !validID(published.ID) {
+		t.Fatalf("invalid prefixed ID %q", published.ID)
+	}
+	if suffix := strings.TrimPrefix(published.ID, "my-super-website-"); len(suffix) != prefixedIDSuffixHexLength {
+		t.Fatalf("suffix length=%d, want=%d", len(suffix), prefixedIDSuffixHexLength)
+	}
+	if published.URL != "http://publisher.test/p/"+published.ID+"/" {
+		t.Fatalf("URL=%q", published.URL)
+	}
+
+	served := httptest.NewRecorder()
+	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL, nil))
+	if served.Code != http.StatusOK || served.Body.String() != "<h1>Hello</h1>" {
+		t.Fatalf("deployment status=%d body=%q", served.Code, served.Body.String())
+	}
+}
+
 // TestPublishValidation checks that malformed requests fail with stable API codes
 // before any deployment becomes visible.
 func TestPublishValidation(t *testing.T) {
@@ -91,6 +114,10 @@ func TestPublishValidation(t *testing.T) {
 		{name: "unsupported type", contentType: "application/json", body: []byte("{}"), status: http.StatusUnsupportedMediaType, code: "unsupported_media_type"},
 		{name: "invalid SPA", contentType: "text/html", query: "?spa=maybe", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_spa"},
 		{name: "zero TTL", contentType: "text/html", query: "?ttl=0", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_ttl"},
+		{name: "uppercase prefix", contentType: "text/html", query: "?prefix=My-Website", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_prefix"},
+		{name: "punctuated prefix", contentType: "text/html", query: "?prefix=my.website", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_prefix"},
+		{name: "dangling prefix hyphen", contentType: "text/html", query: "?prefix=my-website-", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_prefix"},
+		{name: "long prefix", contentType: "text/html", query: "?prefix=abcdefghijklmnopqrstuvwxyz0123456789abcdefghijk", body: []byte("x"), status: http.StatusBadRequest, code: "invalid_prefix"},
 		{name: "empty body", contentType: "text/html", status: http.StatusBadRequest, code: "empty_body"},
 	}
 

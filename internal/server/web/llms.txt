@@ -25,6 +25,7 @@ Publish only the final static artifact that a browser can serve directly. Do not
 - POST /api/v1/publish
 - Optional query `spa=1` enables index.html fallback for client-side routing.
 - Optional query `ttl=<duration>` sets deployment lifetime, for example `ttl=72h` or `ttl=90m`.
+- Optional query `prefix=<slug>` makes the returned ID start with a readable prefix plus a random 16-hex-character suffix. Use lowercase letters, numbers, and hyphens only.
 - Optional header `Tabucom-Password: <password>` sets an 8–128 character printable ASCII visitor password.
 - Optional query `generatePassword=1` generates a visitor password. Do not combine it with `Tabucom-Password`.
 - Content-Type: `text/html`, `text/markdown`, or `application/zip`.
@@ -37,7 +38,7 @@ Publish only the final static artifact that a browser can serve directly. Do not
 ## Examples
 
 HTML:
-`curl -sS -X POST "{{ORIGIN}}/api/v1/publish?ttl=72h" -H "Content-Type: text/html" --data-binary @index.html`
+`curl -sS -X POST "{{ORIGIN}}/api/v1/publish?ttl=72h&prefix=my-super-website" -H "Content-Type: text/html" --data-binary @index.html`
 
 HTML with a generated password:
 `curl -sS -X POST "{{ORIGIN}}/api/v1/publish?generatePassword=1" -H "Content-Type: text/html" --data-binary @index.html`
