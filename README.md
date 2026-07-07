@@ -1,4 +1,4 @@
-# Tabucom
+# Tabucom: Share Your AI Thoughts with Impact
 
 Tabucom is a small self-hosted service for publishing temporary static pages.
 
