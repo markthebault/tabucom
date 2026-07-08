@@ -86,7 +86,8 @@
         "summary": "Read a file from a path-mode deployment",
         "parameters": [
           {"name":"id","in":"path","required":true,"schema":{"type":"string","pattern":"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?-[0-9a-f]{16})$"}},
-          {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."}
+          {"name":"path","in":"path","required":true,"schema":{"type":"string"},"description":"File path relative to the deployment root; use an empty suffix for index.html."},
+          {"name":"raw","in":"query","required":false,"description":"Set to 1 to retrieve the resolved stored file without Tabucom's browser copy control. HTML raw responses are byte-exact source and obey the same expiry and password gates as normal viewing.","schema":{"type":"string","enum":["1"]}}
         ],
         "responses": {"200":{"description":"Published static content"},"401":{"description":"Password form for a protected deployment"},"404":{"description":"Deployment not found, expired, or missing the requested file"}}
       },

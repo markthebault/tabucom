@@ -214,16 +214,19 @@ func (s *Server) serveS3Site(w http.ResponseWriter, r *http.Request, id, request
 		http.NotFound(w, r)
 		return
 	}
-	object, err := s.s3.object(id, requested)
+	objectName := requested
+	object, err := s.s3.object(id, objectName)
 	// Object stores have no directories, so emulate local directory indexes by
 	// trying <path>/index.html after an extensionless exact lookup misses.
 	if err != nil && path.Ext(requested) == "" {
-		object, err = s.s3.object(id, path.Join(requested, "index.html"))
+		objectName = path.Join(requested, "index.html")
+		object, err = s.s3.object(id, objectName)
 	}
 	// SPA fallback is limited to extensionless GET navigation. Assets and HEAD
 	// requests retain ordinary not-found behavior, matching local storage.
 	if err != nil && metadata.SPA && r.Method == http.MethodGet && path.Ext(requested) == "" {
-		object, err = s.s3.object(id, "index.html")
+		objectName = "index.html"
+		object, err = s.s3.object(id, objectName)
 	}
 	if err != nil {
 		http.NotFound(w, r)
@@ -243,8 +246,23 @@ func (s *Server) serveS3Site(w http.ResponseWriter, r *http.Request, id, request
 	if object.ContentType != nil {
 		w.Header().Set("Content-Type", *object.ContentType)
 	}
+	size := int64(-1)
 	if object.ContentLength != nil {
+		size = *object.ContentLength
 		w.Header().Set("Content-Length", strconv.FormatInt(*object.ContentLength, 10))
+	}
+	if shouldDecorateHTML(r, objectName, size) {
+		body, err := io.ReadAll(object.Body)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		body = decorateHTML(body)
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		w.Header().Del("Accept-Ranges")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	// HEAD performs the same authorization and resolution but emits no body.

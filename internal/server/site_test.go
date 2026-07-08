@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -40,6 +41,10 @@ func TestExpirySweep(t *testing.T) {
 	served := httptest.NewRecorder()
 	server.ServeHTTP(served, request)
 	requireStatus(t, served, http.StatusNotFound)
+
+	raw := httptest.NewRecorder()
+	server.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, published.URL+"?raw=1", nil))
+	requireStatus(t, raw, http.StatusNotFound)
 }
 
 // TestServeCacheControlHonorsRemainingTTL checks both sub-second cache rounding
@@ -98,6 +103,98 @@ func TestDeploymentServingPolicy(t *testing.T) {
 			requireStatus(t, served, test.status)
 		})
 	}
+}
+
+// TestCopyHTMLRawMode verifies the split between browser convenience chrome and
+// the byte-exact raw source contract used by humans and agents.
+func TestCopyHTMLRawMode(t *testing.T) {
+	server := testServer(t, nil)
+	html := []byte("<!doctype html><html><body><h1>Copy me</h1></body></html>")
+	published, response := publish(t, server, "text/html", html, "")
+	requireStatus(t, response, http.StatusCreated)
+
+	served := httptest.NewRecorder()
+	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL, nil))
+	requireStatus(t, served, http.StatusOK)
+	if !strings.Contains(served.Body.String(), "<h1>Copy me</h1>") || !strings.Contains(served.Body.String(), copyHTMLMarker) {
+		t.Fatalf("decorated response missing page or copy marker: %q", served.Body.String())
+	}
+
+	raw := httptest.NewRecorder()
+	server.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, published.URL+"?raw=1", nil))
+	requireStatus(t, raw, http.StatusOK)
+	if raw.Body.String() != string(html) {
+		t.Fatalf("raw body=%q, want %q", raw.Body.String(), html)
+	}
+
+	head := httptest.NewRecorder()
+	server.ServeHTTP(head, httptest.NewRequest(http.MethodHead, published.URL, nil))
+	requireStatus(t, head, http.StatusOK)
+	if head.Body.Len() != 0 {
+		t.Fatalf("HEAD returned body %q", head.Body.String())
+	}
+}
+
+// TestCopyHTMLRawModeForGeneratedAndArchivedSites covers the other publication
+// forms and proves non-HTML assets remain ordinary static files.
+func TestCopyHTMLRawModeForGeneratedAndArchivedSites(t *testing.T) {
+	server := testServer(t, nil)
+
+	markdown, response := publish(t, server, "text/markdown", []byte("# Report"), "")
+	requireStatus(t, response, http.StatusCreated)
+	markdownRaw := httptest.NewRecorder()
+	server.ServeHTTP(markdownRaw, httptest.NewRequest(http.MethodGet, markdown.URL+"?raw=1", nil))
+	requireStatus(t, markdownRaw, http.StatusOK)
+	if markdownRaw.Body.String() != string(renderMarkdown([]byte("# Report"))) {
+		t.Fatalf("markdown raw body=%q", markdownRaw.Body.String())
+	}
+
+	zipHTML := "<!doctype html><title>Zip</title><h1>archive</h1>"
+	zipCSS := "body{color:red}"
+	archived, response := publish(t, server, "application/zip", zipBody(t,
+		zipEntry{name: "index.html", body: zipHTML},
+		zipEntry{name: "assets/app.css", body: zipCSS},
+	), "")
+	requireStatus(t, response, http.StatusCreated)
+
+	archivedRaw := httptest.NewRecorder()
+	server.ServeHTTP(archivedRaw, httptest.NewRequest(http.MethodGet, archived.URL+"?raw=1", nil))
+	requireStatus(t, archivedRaw, http.StatusOK)
+	if archivedRaw.Body.String() != zipHTML {
+		t.Fatalf("zip raw body=%q", archivedRaw.Body.String())
+	}
+
+	css := httptest.NewRecorder()
+	server.ServeHTTP(css, httptest.NewRequest(http.MethodGet, archived.URL+"assets/app.css?raw=1", nil))
+	requireStatus(t, css, http.StatusOK)
+	if css.Body.String() != zipCSS || strings.Contains(css.Body.String(), copyHTMLMarker) {
+		t.Fatalf("asset changed: %q", css.Body.String())
+	}
+}
+
+func TestCopyHTMLRawModeHonorsSPAFallback(t *testing.T) {
+	server := testServer(t, nil)
+	html := []byte("<!doctype html><html><body><h1>App</h1></body></html>")
+	published, response := publish(t, server, "text/html", html, "?spa=1")
+	requireStatus(t, response, http.StatusCreated)
+
+	served := httptest.NewRecorder()
+	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL+"deep/route", nil))
+	requireStatus(t, served, http.StatusOK)
+	if !strings.Contains(served.Body.String(), copyHTMLMarker) {
+		t.Fatalf("SPA view was not decorated: %q", served.Body.String())
+	}
+
+	raw := httptest.NewRecorder()
+	server.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, published.URL+"deep/route?raw=1", nil))
+	requireStatus(t, raw, http.StatusOK)
+	if raw.Body.String() != string(html) {
+		t.Fatalf("SPA raw body=%q, want %q", raw.Body.String(), html)
+	}
+
+	asset := httptest.NewRecorder()
+	server.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, published.URL+"deep/route.css?raw=1", nil))
+	requireStatus(t, asset, http.StatusNotFound)
 }
 
 // TestSweepRemovesStaleStages ensures cleanup distinguishes abandoned stages from

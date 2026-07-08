@@ -75,6 +75,12 @@ func TestCustomPasswordLifecycle(t *testing.T) {
 	if unauthorized.Header().Get("Cache-Control") != "no-store" || !strings.Contains(unauthorized.Body.String(), `<dialog open`) || !strings.Contains(unauthorized.Body.String(), `name="password"`) {
 		t.Fatalf("unexpected password form: headers=%v body=%q", unauthorized.Header(), unauthorized.Body.String())
 	}
+	unauthorizedRaw := httptest.NewRecorder()
+	server.ServeHTTP(unauthorizedRaw, httptest.NewRequest(http.MethodGet, published.URL+"?raw=1", nil))
+	requireStatus(t, unauthorizedRaw, http.StatusUnauthorized)
+	if !strings.Contains(unauthorizedRaw.Body.String(), `<dialog open`) || strings.Contains(unauthorizedRaw.Body.String(), "<h1>secret</h1>") {
+		t.Fatalf("raw request bypassed password gate: body=%q", unauthorizedRaw.Body.String())
+	}
 	// HEAD follows the same authorization policy but must never emit HTML bytes.
 	head := httptest.NewRecorder()
 	server.ServeHTTP(head, httptest.NewRequest(http.MethodHead, published.URL, nil))
@@ -112,8 +118,17 @@ func TestCustomPasswordLifecycle(t *testing.T) {
 	request.AddCookie(cookies[0])
 	server.ServeHTTP(served, request)
 	requireStatus(t, served, http.StatusOK)
-	if served.Body.String() != "<h1>secret</h1>" || served.Header().Get("Cache-Control") != "private, no-store" {
+	if !strings.Contains(served.Body.String(), "<h1>secret</h1>") || !strings.Contains(served.Body.String(), copyHTMLMarker) || served.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("unexpected protected response: headers=%v body=%q", served.Header(), served.Body.String())
+	}
+
+	raw := httptest.NewRecorder()
+	rawRequest := httptest.NewRequest(http.MethodGet, published.URL+"dashboard?raw=1", nil)
+	rawRequest.AddCookie(cookies[0])
+	server.ServeHTTP(raw, rawRequest)
+	requireStatus(t, raw, http.StatusOK)
+	if raw.Body.String() != "<h1>secret</h1>" || strings.Contains(raw.Body.String(), copyHTMLMarker) {
+		t.Fatalf("unexpected protected raw response: headers=%v body=%q", raw.Header(), raw.Body.String())
 	}
 }
 
