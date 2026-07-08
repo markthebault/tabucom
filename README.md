@@ -16,6 +16,38 @@ It is useful for:
 Tabucom does not run uploaded code, install packages, build projects, or execute
 server-side scripts. It only serves static files.
 
+## Use With Coding Agents
+
+Install the Tabucom skill in the [Agent Skills](https://agentskills.io) format
+with [`npx skills`](https://github.com/vercel-labs/skills):
+
+```sh
+npx skills add markthebault/tabucom --skill tabucom
+```
+
+Set the Tabucom origin in your shell profile so coding agents can find the
+service. Use the URL for your own Tabucom deployment:
+
+```sh
+echo 'export TABUCOM_BASE_URL="https://tabucom.example.com"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+If you use Bash instead:
+
+```sh
+echo 'export TABUCOM_BASE_URL="https://tabucom.example.com"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then ask your coding agent to publish a static artifact with Tabucom:
+
+```text
+$tabucom Publish /tmp/report.html and return the URL plus expiry.
+```
+
+The canonical skill lives in this repository at `skills/tabucom/SKILL.md`.
+
 ## Quick Start
 
 Run Tabucom locally with Docker:
@@ -218,6 +250,13 @@ API. Use publish tokens for that.
 Published HTML pages include a small floating "Copy Page" button for browser
 handoff to an AI agent. The button copies the resolved stored HTML file, not the
 button chrome itself.
+
+## Releases
+
+Tabucom uses GitHub Actions and Release Please for automated changelogs, tags,
+GitHub Releases, snapshot binaries, release binaries, and GHCR container images.
+See [docs/releases.md](docs/releases.md) for the release flow and commit message
+rules.
 
 You can also fetch the same byte-exact source directly by adding `raw=1` to a
 published URL:

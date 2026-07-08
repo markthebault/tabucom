@@ -12,7 +12,7 @@ permissions:
 
 env:
   IMAGE_REPOSITORY: ghcr.io/${{ github.repository }}
-  IMAGE_TAG: ${{ vars.DOCKER_IMAGE_TAG || 'latest' }}
+  IMAGE_TAG: main
   IMAGE_PLATFORM: ${{ vars.DOCKER_IMAGE_PLATFORM || 'linux/amd64' }}
 
 jobs:
@@ -52,4 +52,28 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        run: IMAGE_SHORT_SHA="$(git rev-parse --short HEAD)" make docker-push
+        run: IMAGE_SHORT_SHA="main-$(git rev-parse --short HEAD)" make docker-push
+
+  snapshot-build:
+    name: Snapshot build
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build snapshot binaries
+        run: ./scripts/build-release.sh snapshot-${GITHUB_SHA::7}
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tabucom-snapshot-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
