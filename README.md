@@ -213,6 +213,24 @@ curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?generatePassword=1'
 Visitor passwords protect the published page. They do not protect the publish
 API. Use publish tokens for that.
 
+## Copy Page HTML
+
+Published HTML pages include a small floating "Copy Page" button for browser
+handoff to an AI agent. The button copies the resolved stored HTML file, not the
+button chrome itself.
+
+You can also fetch the same byte-exact source directly by adding `raw=1` to a
+published URL:
+
+```sh
+curl -fsS 'https://tabucom.example.com/p/{id}/?raw=1'
+```
+
+`raw=1` follows the same expiry, SPA fallback, and visitor-password rules as
+normal page viewing. For non-HTML assets it simply serves the resolved file
+without adding any browser copy control. Pages with restrictive Content Security
+Policy may block the floating button; `raw=1` remains available.
+
 ## Use With An LLM
 
 Open the Tabucom home page and click "Copy setup instructions for my agent".

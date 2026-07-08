@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -121,7 +122,36 @@ func (s *Server) serveSite(w http.ResponseWriter, r *http.Request, id, requested
 	} else {
 		w.Header().Set("Cache-Control", deploymentCacheControl(metadata.ExpiresAt, now))
 	}
-	http.ServeFile(w, r, file)
+	s.serveLocalSiteFile(w, r, file)
+}
+
+// serveLocalSiteFile keeps raw/static behavior on http.ServeFile and decorates
+// only small HTML GET responses where the browser copy control is useful.
+func (s *Server) serveLocalSiteFile(w http.ResponseWriter, r *http.Request, file string) {
+	info, err := os.Stat(file)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !shouldDecorateHTML(r, file, info.Size()) {
+		http.ServeFile(w, r, file)
+		return
+	}
+
+	body, err := os.ReadFile(file)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	body = decorateHTML(body)
+	contentType := mime.TypeByExtension(filepath.Ext(file))
+	if contentType == "" {
+		contentType = "text/html; charset=utf-8"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.Header().Del("Accept-Ranges")
+	_, _ = w.Write(body)
 }
 
 // normalizeSitePath applies URL-path semantics before converting to a host path.

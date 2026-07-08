@@ -19,6 +19,11 @@
       "generated_password_query": "generatePassword=1",
       "default_ttl_hours": 720,
       "publishing_authentication": "{{PUBLISHING_AUTHENTICATION}}"
+    },
+    "raw_source": {
+      "method": "GET",
+      "query": "raw=1",
+      "description": "Append raw=1 to a published deployment URL to retrieve the resolved stored file without Tabucom's browser copy control. HTML responses are byte-exact source for agent handoff and obey the same expiry and password gates as normal viewing."
     }
   },
   "constraints": [

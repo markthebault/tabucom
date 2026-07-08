@@ -46,8 +46,13 @@ func TestPublishHTMLAndServe(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, published.URL, nil)
 	served := httptest.NewRecorder()
 	server.ServeHTTP(served, request)
-	if served.Code != http.StatusOK || served.Body.String() != "<h1>Hello</h1>" {
+	if served.Code != http.StatusOK || !strings.Contains(served.Body.String(), "<h1>Hello</h1>") || !strings.Contains(served.Body.String(), copyHTMLMarker) {
 		t.Fatalf("deployment status=%d body=%q", served.Code, served.Body.String())
+	}
+	raw := httptest.NewRecorder()
+	server.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, published.URL+"?raw=1", nil))
+	if raw.Code != http.StatusOK || raw.Body.String() != "<h1>Hello</h1>" {
+		t.Fatalf("raw deployment status=%d body=%q", raw.Code, raw.Body.String())
 	}
 
 	// Extensionless navigation falls back only because this publish enabled SPA.
@@ -95,7 +100,7 @@ func TestPublishPrefix(t *testing.T) {
 
 	served := httptest.NewRecorder()
 	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL, nil))
-	if served.Code != http.StatusOK || served.Body.String() != "<h1>Hello</h1>" {
+	if served.Code != http.StatusOK || !strings.Contains(served.Body.String(), "<h1>Hello</h1>") || !strings.Contains(served.Body.String(), copyHTMLMarker) {
 		t.Fatalf("deployment status=%d body=%q", served.Code, served.Body.String())
 	}
 }
