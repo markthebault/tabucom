@@ -65,7 +65,7 @@ After that merge, Release Please automatically creates:
 - a GitHub Release;
 - release notes based on the changelog.
 
-Then the release binary workflow builds and uploads these assets:
+Then the Release Please workflow builds and uploads these assets:
 
 ```text
 tabucom_vX.Y.Z_darwin_amd64.tar.gz
@@ -76,7 +76,7 @@ tabucom_vX.Y.Z_windows_amd64.zip
 checksums.txt
 ```
 
-The release workflow also publishes the GHCR image from the Release Please tag. For a release tag such as `v0.2.0`, the image receives:
+The same Release Please workflow also publishes the GHCR image from the Release Please tag. For a release tag such as `v0.2.0`, the image receives:
 
 ```text
 ghcr.io/markthebault/tabucom:v0.2.0
@@ -86,6 +86,10 @@ ghcr.io/markthebault/tabucom:latest
 ```
 
 Use GitHub releases for immutable binary downloads and semver GHCR tags for container deployment. Use `main` or `main-<short-sha>` only for testing unreleased code.
+
+The separate `Release Binaries` workflow is a manual backfill path. Use it with
+`workflow_dispatch` and an existing tag, such as `v0.2.0`, if release assets or
+container tags need to be rebuilt after a workflow fix.
 
 ## Snapshot Binaries On Main
 
