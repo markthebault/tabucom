@@ -116,8 +116,8 @@ func TestCopyHTMLRawMode(t *testing.T) {
 	served := httptest.NewRecorder()
 	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL, nil))
 	requireStatus(t, served, http.StatusOK)
-	if !strings.Contains(served.Body.String(), "<h1>Copy me</h1>") || !strings.Contains(served.Body.String(), copyHTMLMarker) {
-		t.Fatalf("decorated response missing page or copy marker: %q", served.Body.String())
+	if !strings.Contains(served.Body.String(), "<h1>Copy me</h1>") || !copyControlsPresent(served.Body.String()) {
+		t.Fatalf("decorated response missing page or copy controls: %q", served.Body.String())
 	}
 
 	raw := httptest.NewRecorder()
@@ -125,6 +125,9 @@ func TestCopyHTMLRawMode(t *testing.T) {
 	requireStatus(t, raw, http.StatusOK)
 	if raw.Body.String() != string(html) {
 		t.Fatalf("raw body=%q, want %q", raw.Body.String(), html)
+	}
+	if anyCopyControlMarkerPresent(raw.Body.String()) {
+		t.Fatalf("raw response contains copy controls: %q", raw.Body.String())
 	}
 
 	head := httptest.NewRecorder()
@@ -181,7 +184,7 @@ func TestCopyHTMLRawModeHonorsSPAFallback(t *testing.T) {
 	served := httptest.NewRecorder()
 	server.ServeHTTP(served, httptest.NewRequest(http.MethodGet, published.URL+"deep/route", nil))
 	requireStatus(t, served, http.StatusOK)
-	if !strings.Contains(served.Body.String(), copyHTMLMarker) {
+	if !copyControlsPresent(served.Body.String()) {
 		t.Fatalf("SPA view was not decorated: %q", served.Body.String())
 	}
 
@@ -195,6 +198,40 @@ func TestCopyHTMLRawModeHonorsSPAFallback(t *testing.T) {
 	asset := httptest.NewRecorder()
 	server.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, published.URL+"deep/route.css?raw=1", nil))
 	requireStatus(t, asset, http.StatusNotFound)
+}
+
+func copyControlsPresent(body string) bool {
+	for _, marker := range []string{
+		copyHTMLMarker,
+		copyPrimaryMarker,
+		copyArrowMarker,
+		copyMenuMarker,
+		copyDownloadMarker,
+		`aria-haspopup="menu"`,
+		`aria-expanded="false"`,
+		`role="menu"`,
+		`role="menuitem"`,
+	} {
+		if !strings.Contains(body, marker) {
+			return false
+		}
+	}
+	return true
+}
+
+func anyCopyControlMarkerPresent(body string) bool {
+	for _, marker := range []string{
+		copyHTMLMarker,
+		copyPrimaryMarker,
+		copyArrowMarker,
+		copyMenuMarker,
+		copyDownloadMarker,
+	} {
+		if strings.Contains(body, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestSweepRemovesStaleStages ensures cleanup distinguishes abandoned stages from
