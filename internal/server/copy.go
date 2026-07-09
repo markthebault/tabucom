@@ -16,6 +16,10 @@ import (
 )
 
 const copyHTMLMarker = "data-tabucom-copy-html"
+const copyPrimaryMarker = "data-tabucom-copy-primary"
+const copyArrowMarker = "data-tabucom-copy-arrow"
+const copyMenuMarker = "data-tabucom-copy-menu"
+const copyDownloadMarker = "data-tabucom-download-html"
 const maxDecoratedHTMLBytes = 5 << 20
 
 // rawMode reports whether a request wants the stored deployment bytes without
@@ -72,11 +76,23 @@ func copyHTMLSnippet() string {
   document.body.appendChild(host);
   const root = host.attachShadow ? host.attachShadow({mode:"closed"}) : host;
   root.innerHTML = ` + "`" + `<style>
-button{all:initial;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:92px;height:36px;padding:0 12px;border:1px solid rgba(255,255,255,.28);border-radius:6px;background:#111;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.22);font:700 13px/1 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
+button{all:initial;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;height:36px;border:1px solid rgba(255,255,255,.28);background:#111;color:#fff;font:700 13px/1 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
 button:focus{outline:2px solid #0c7569;outline-offset:3px}
 button[disabled]{opacity:.72;cursor:default}
-</style><button type="button" aria-label="Copy source HTML">` + label + `</button>` + "`" + `;
-  const button = root.querySelector("button");
+.wrap{all:initial;position:relative;display:inline-flex;filter:drop-shadow(0 8px 24px rgba(0,0,0,.22))}
+.primary{min-width:92px;padding:0 12px;border-radius:6px 0 0 6px}
+.arrow{width:34px;border-left:0;border-radius:0 6px 6px 0;font-size:14px}
+.menu{all:initial;position:absolute;right:0;bottom:42px;display:grid;min-width:142px;padding:5px;border:1px solid rgba(17,17,17,.14);border-radius:7px;background:#fff;box-shadow:0 12px 32px rgba(0,0,0,.22)}
+.menu[hidden]{display:none}
+.menu button{width:100%;height:32px;justify-content:flex-start;border:0;border-radius:4px;background:#fff;color:#111;padding:0 9px;box-shadow:none}
+.menu button:focus,.menu button:hover{background:#eef6f4;color:#111}
+</style><div class="wrap"><button class="primary" type="button" ` + copyPrimaryMarker + ` aria-label="Copy source HTML">` + label + `</button><button class="arrow" type="button" ` + copyArrowMarker + ` aria-label="More page actions" aria-haspopup="menu" aria-expanded="false">▾</button><div class="menu" ` + copyMenuMarker + ` role="menu" hidden><button type="button" ` + copyDownloadMarker + ` role="menuitem">Download HTML</button></div></div>` + "`" + `;
+  const primary = root.querySelector("[` + copyPrimaryMarker + `]");
+  const arrow = root.querySelector("[` + copyArrowMarker + `]");
+  const menu = root.querySelector("[` + copyMenuMarker + `]");
+  const download = root.querySelector("[` + copyDownloadMarker + `]");
+  let menuOpen = false;
+
   function legacyCopy(text) {
     const input = document.createElement("textarea");
     input.value = text;
@@ -89,27 +105,94 @@ button[disabled]{opacity:.72;cursor:default}
     document.body.removeChild(input);
     return copied;
   }
-  button.addEventListener("click", async () => {
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = "Copying...";
+
+  function setMenu(open, focusTarget = false) {
+    menuOpen = open;
+    menu.hidden = !open;
+    arrow.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && focusTarget) download.focus();
+    if (!open && focusTarget) arrow.focus();
+  }
+
+  function filename() {
+    const match = window.location.pathname.match(/^\/p\/([a-z0-9-]+)(?:\/|$)/);
+    if (match) return ` + "`" + `tabucom-${match[1]}.html` + "`" + `;
+    const labels = window.location.hostname.split(".");
+    if (labels.length > 2 && /^[a-z0-9-]+$/.test(labels[0])) {
+      return ` + "`" + `tabucom-${labels[0]}.html` + "`" + `;
+    }
+    return "tabucom-page.html";
+  }
+
+  async function rawText() {
+    const response = await fetch(rawURL.href, {cache:"no-store", credentials:"same-origin"});
+    if (!response.ok) throw new Error("raw request failed");
+    return response.text();
+  }
+
+  primary.addEventListener("click", async () => {
+    const original = primary.textContent;
+    primary.disabled = true;
+    primary.textContent = "Copying...";
     try {
-      const response = await fetch(rawURL.href, {cache:"no-store", credentials:"same-origin"});
-      if (!response.ok) throw new Error("raw request failed");
-      const text = await response.text();
+      const text = await rawText();
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
       } else if (!legacyCopy(text)) {
         throw new Error("copy failed");
       }
-      button.textContent = "Copied";
+      primary.textContent = "Copied";
     } catch {
-      button.textContent = "Copy failed";
+      primary.textContent = "Copy failed";
     }
     setTimeout(() => {
-      button.disabled = false;
-      button.textContent = original;
+      primary.disabled = false;
+      primary.textContent = original;
     }, 1500);
+  });
+
+  arrow.addEventListener("click", () => setMenu(!menuOpen, menu.hidden));
+  arrow.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setMenu(!menuOpen, true);
+    } else if (event.key === "Escape" && menuOpen) {
+      event.preventDefault();
+      setMenu(false, true);
+    }
+  });
+  download.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setMenu(false, true);
+    }
+  });
+  download.addEventListener("click", async () => {
+    const original = download.textContent;
+    download.disabled = true;
+    download.textContent = "Downloading...";
+    try {
+      const text = await rawText();
+      const url = URL.createObjectURL(new Blob([text], {type:"text/html;charset=utf-8"}));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename();
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      download.textContent = "Downloaded";
+      setMenu(false, true);
+    } catch {
+      download.textContent = "Download failed";
+    }
+    setTimeout(() => {
+      download.disabled = false;
+      download.textContent = original;
+    }, 1500);
+  });
+  document.addEventListener("click", (event) => {
+    if (menuOpen && event.target !== host) setMenu(false);
   });
 })();
 </script>`

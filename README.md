@@ -247,9 +247,9 @@ API. Use publish tokens for that.
 
 ## Copy Page HTML
 
-Published HTML pages include a small floating "Copy Page" button for browser
-handoff to an AI agent. The button copies the resolved stored HTML file, not the
-button chrome itself.
+Published HTML pages include a small floating "Copy Page" control for browser
+handoff to an AI agent. The main button copies the resolved stored HTML file,
+not the button chrome itself. The arrow menu can also download that HTML file.
 
 ## Releases
 
