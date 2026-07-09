@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/markthebault/tabucom/compare/v0.2.1...v0.3.0) (2026-07-09)
+
+
+### Features
+
+* add copy page download menu ([1649d1a](https://github.com/markthebault/tabucom/commit/1649d1a87029bae666b09929a90591850f362c91))
+* add copy page download menu ([90dfa04](https://github.com/markthebault/tabucom/commit/90dfa04038f5340722ef16e94f482a7924465d25))
+
 ## [0.2.1](https://github.com/markthebault/tabucom/compare/v0.2.0...v0.2.1) (2026-07-09)
 
 
