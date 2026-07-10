@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // embeddedWeb keeps discovery and documentation assets inside the executable so
@@ -41,7 +43,7 @@ var webPaths = map[string]string{
 const tokenUI = `<div class="token-panel" data-token-panel>
             <div class="token-row">
               <button class="token-button" type="button" data-generate-token>Generate Publish Token</button>
-              <p class="token-ttl">Token TTL: 1 hour. Shown once after generation.</p>
+              <p class="token-ttl">Token TTL: {{TOKEN_TTL}}. Shown once after generation.</p>
             </div>
             <p class="token-help">This token lets your LLM publish a document to Tabucom. Generate one, copy it, and give it to the LLM when you ask it to publish.</p>
             <div data-token-result hidden>
@@ -129,7 +131,7 @@ func (s *Server) applyFeaturePlaceholders(data []byte) []byte {
 	publishingAuthentication := "none"
 	publishSummary := openPublishSummary
 	if s.cfg.StatelessPublishTokensEnabled {
-		tokenHTML = tokenUI
+		tokenHTML = strings.ReplaceAll(tokenUI, "{{TOKEN_TTL}}", publishTokenTTLLabel(s.cfg.StatelessPublishTokenTTL))
 		tokenInstructions = llmsTokenInstructions
 		agentInstructions = agentTokenInstructions
 		publishingAuthentication = "stateless_bearer_token"
@@ -141,4 +143,13 @@ func (s *Server) applyFeaturePlaceholders(data []byte) []byte {
 	data = bytes.ReplaceAll(data, []byte("{{PUBLISHING_AUTHENTICATION}}"), []byte(publishingAuthentication))
 	data = bytes.ReplaceAll(data, []byte("{{PUBLISH_AUTH_SUMMARY}}"), []byte(publishSummary))
 	return data
+}
+
+// publishTokenTTLLabel preserves the landing page's familiar default wording
+// while showing custom durations exactly as operators configure them.
+func publishTokenTTLLabel(ttl time.Duration) string {
+	if ttl == time.Hour {
+		return "1 hour"
+	}
+	return ttl.String()
 }

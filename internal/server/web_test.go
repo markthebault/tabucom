@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHealthAndDiscoveryDocuments verifies every embedded public document, origin
@@ -127,6 +128,15 @@ func TestStatelessTokenInstructionsOnlyWhenEnabled(t *testing.T) {
 	}
 	if strings.Contains(enabledLLMS, "Publishing requires no authentication") {
 		t.Fatal("enabled llms.txt contains contradictory open-publish guidance")
+	}
+
+	configured := testServer(t, func(config *Config) {
+		config.StatelessPublishTokensEnabled = true
+		config.StatelessTokenSigningSecret = testSigningSecret
+		config.StatelessPublishTokenTTL = 30 * 24 * time.Hour
+	})
+	if body := getBody(t, configured, "http://docs.test/"); !strings.Contains(body, "Token TTL: 720h0m0s") {
+		t.Fatal("enabled home does not show the configured token TTL")
 	}
 }
 

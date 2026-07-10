@@ -16,7 +16,10 @@ import (
 	"time"
 )
 
-const deploymentTTL = 30 * 24 * time.Hour
+const (
+	deploymentTTL            = 30 * 24 * time.Hour
+	statelessPublishTokenTTL = time.Hour
+)
 
 // Config contains server behavior, storage settings, and operational limits.
 // Fields remain explicit instead of accepting arbitrary environment keys so a
@@ -53,6 +56,8 @@ type Config struct {
 	StatelessPublishTokensEnabled bool
 	// StatelessTokenSigningSecret signs stateless publish tokens when enabled.
 	StatelessTokenSigningSecret string
+	// StatelessPublishTokenTTL controls how long generated publish tokens remain valid.
+	StatelessPublishTokenTTL time.Duration
 
 	// Now is injectable for deterministic expiry and rate-limit tests.
 	Now func() time.Time
@@ -62,16 +67,17 @@ type Config struct {
 // them directly in tests or through ConfigFromEnv in the executable.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:       ":8080",
-		DataDir:          "./data",
-		S3Region:         "us-east-1",
-		TTL:              deploymentTTL,
-		SweepInterval:    time.Hour,
-		MaxUploadBytes:   100 << 20,
-		MaxExpandedSize:  500 << 20,
-		MaxFiles:         10000,
-		RateLimitPerHour: 60,
-		Now:              time.Now,
+		ListenAddr:               ":8080",
+		DataDir:                  "./data",
+		S3Region:                 "us-east-1",
+		TTL:                      deploymentTTL,
+		SweepInterval:            time.Hour,
+		MaxUploadBytes:           100 << 20,
+		MaxExpandedSize:          500 << 20,
+		MaxFiles:                 10000,
+		RateLimitPerHour:         60,
+		StatelessPublishTokenTTL: statelessPublishTokenTTL,
+		Now:                      time.Now,
 	}
 }
 
@@ -137,6 +143,9 @@ func ConfigFromEnv() (Config, error) {
 	if cfg.RateLimitPerHour, err = intFromEnv("RATE_LIMIT_PER_HOUR", cfg.RateLimitPerHour); err != nil {
 		return cfg, err
 	}
+	if cfg.StatelessPublishTokenTTL, err = durationFromEnv("STATELESS_PUBLISH_TOKEN_TTL", cfg.StatelessPublishTokenTTL); err != nil {
+		return cfg, err
+	}
 	if value := os.Getenv("STATELESS_PUBLISH_TOKENS_ENABLED"); value != "" {
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
@@ -192,7 +201,7 @@ func intFromEnv(name string, fallback int) (int, error) {
 // validate rejects values that would disable retention or resource bounds. The
 // service never supports unlimited uploads, expansion, entry counts, or TTLs.
 func (cfg Config) validate() error {
-	if cfg.DataDir == "" || cfg.TTL <= 0 || cfg.SweepInterval <= 0 ||
+	if cfg.DataDir == "" || cfg.TTL <= 0 || cfg.SweepInterval <= 0 || cfg.StatelessPublishTokenTTL <= 0 ||
 		cfg.MaxUploadBytes <= 0 || cfg.MaxExpandedSize <= 0 ||
 		cfg.MaxFiles <= 0 || cfg.RateLimitPerHour <= 0 {
 		return errors.New("data directory, durations, and limits must be positive")

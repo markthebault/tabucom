@@ -26,6 +26,7 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("RATE_LIMIT_PER_HOUR", "7")
 	t.Setenv("STATELESS_PUBLISH_TOKENS_ENABLED", "true")
 	t.Setenv("STATELESS_TOKEN_SIGNING_SECRET", "12345678901234567890123456789012")
+	t.Setenv("STATELESS_PUBLISH_TOKEN_TTL", "720h")
 
 	config, err := ConfigFromEnv()
 	if err != nil {
@@ -41,6 +42,7 @@ func TestConfigFromEnv(t *testing.T) {
 		config.MaxFiles != 25 ||
 		config.RateLimitPerHour != 7 ||
 		!config.StatelessPublishTokensEnabled ||
+		config.StatelessPublishTokenTTL != 30*24*time.Hour ||
 		config.StatelessTokenSigningSecret == "" {
 		t.Fatalf("unexpected config: %+v", config)
 	}
@@ -97,6 +99,8 @@ func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {
 		{name: "zero file count", key: "MAX_FILES", value: "0"},
 		{name: "zero rate limit", key: "RATE_LIMIT_PER_HOUR", value: "0"},
 		{name: "invalid stateless token flag", key: "STATELESS_PUBLISH_TOKENS_ENABLED", value: "maybe"},
+		{name: "invalid stateless token duration", key: "STATELESS_PUBLISH_TOKEN_TTL", value: "one-month"},
+		{name: "zero stateless token duration", key: "STATELESS_PUBLISH_TOKEN_TTL", value: "0s"},
 	}
 
 	for _, test := range tests {
