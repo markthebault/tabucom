@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/markthebault/tabucom/compare/v0.3.0...v0.4.0) (2026-07-10)
+
+
+### Features
+
+* configure publish token ttl ([e57e879](https://github.com/markthebault/tabucom/commit/e57e879e82cc8f27c27588e65edd172ad1882ef6))
+* configure publish token ttl ([40f2d46](https://github.com/markthebault/tabucom/commit/40f2d467bd68cef06565a807d5ba25800ca72694))
+
 ## [0.3.0](https://github.com/markthebault/tabucom/compare/v0.2.1...v0.3.0) (2026-07-09)
 
 
