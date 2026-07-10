@@ -148,6 +148,7 @@ docker run -d --name tabucom \
   -e PUBLIC_API_URL=https://tabucom.example.com \
   -e STATELESS_PUBLISH_TOKENS_ENABLED=true \
   -e STATELESS_TOKEN_SIGNING_SECRET='change-this-to-a-long-random-secret-value' \
+  -e STATELESS_PUBLISH_TOKEN_TTL=720h \
   -v tabucom-data:/data \
   ghcr.io/markthebault/tabucom:latest
 ```
@@ -161,7 +162,9 @@ When tokens are enabled:
 - expired or invalid tokens are rejected
 
 Use a signing secret of at least 32 characters. A password manager is a good way
-to generate it.
+to generate it. Generated tokens are valid for one hour by default. Set
+`STATELESS_PUBLISH_TOKEN_TTL` to a positive Go-style duration such as `720h`
+for 30 days.
 
 If you publish with a script while tokens are enabled, include this header:
 
@@ -322,6 +325,7 @@ tokens.
 | `TTL` | `720h` | Default lifetime when a request does not set `ttl` |
 | `STATELESS_PUBLISH_TOKENS_ENABLED` | `false` | Require a publish token for `POST /api/v1/publish` |
 | `STATELESS_TOKEN_SIGNING_SECRET` | unset | Secret used to sign publish tokens |
+| `STATELESS_PUBLISH_TOKEN_TTL` | `1h` | Lifetime of generated publish tokens, as a Go-style duration |
 | `PREVIEW_DOMAIN` | empty | Optional wildcard domain for isolated preview URLs |
 | `MAX_UPLOAD_BYTES` | `104857600` | Maximum upload size |
 | `MAX_EXPANDED_BYTES` | `524288000` | Maximum expanded ZIP size |

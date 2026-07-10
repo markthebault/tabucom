@@ -18,8 +18,6 @@ import (
 	"time"
 )
 
-const statelessPublishTokenTTL = time.Hour
-
 var errInvalidPublishToken = errors.New("invalid publish token")
 
 type tokenHeader struct {
@@ -42,13 +40,13 @@ type tokenResponse struct {
 // publishToken issues a signed bearer token for agents and harnesses. The token
 // is stateless; validation recomputes the signature and checks the claims.
 func (s *Server) publishToken(w http.ResponseWriter, r *http.Request) {
-	token, expiresAt, err := s.newPublishToken(s.cfg.Now().UTC(), statelessPublishTokenTTL)
+	token, expiresAt, err := s.newPublishToken(s.cfg.Now().UTC(), s.cfg.StatelessPublishTokenTTL)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, "internal_error", "could not generate token")
 		return
 	}
 	jsonReply(w, http.StatusCreated, tokenResponse{
-		Token: token, ExpiresAt: expiresAt, TTLSeconds: int64(statelessPublishTokenTTL.Seconds()),
+		Token: token, ExpiresAt: expiresAt, TTLSeconds: int64(s.cfg.StatelessPublishTokenTTL.Seconds()),
 	})
 }
 
