@@ -1,0 +1,16 @@
+{
+  "name": "tabucom",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development hooks for the Tabucom Go service.",
+  "scripts": {
+    "prepare": "husky",
+    "lint": "make check",
+    "lint:go": "make check"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "husky": "^9.1.7"
+  }
+}

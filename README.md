@@ -63,6 +63,24 @@ Open <http://localhost:8080>.
 
 The named Docker volume keeps published pages across container restarts.
 
+## Development Hooks
+
+This repository uses Husky for local Git hooks. Install the hook tooling once
+after cloning:
+
+```sh
+npm install
+```
+
+The pre-commit hook runs `make check`, which verifies formatting, tests, vet,
+and embedded JSON metadata. The commit-msg hook checks commit messages with
+Conventional Commits, such as:
+
+```text
+feat: add preview publishing
+fix(server): reject unsafe archive path
+```
+
 Publish a small HTML page:
 
 ```sh
