@@ -65,9 +65,21 @@ This Tabucom instance requires a stateless publish token.
 3. Publish with ` + "`Authorization: Bearer $TABUCOM_PUBLISH_TOKEN`" + `.
 `
 
+const llmsAPIKeyInstructions = `
+## Publish API key
+
+This Tabucom instance requires an operator-provided publish API key.
+
+1. Pass it to the LLM or harness as ` + "`TABUCOM_PUBLISH_API_KEY`" + `.
+2. Publish with ` + "`X-API-Key: $TABUCOM_PUBLISH_API_KEY`" + `.
+`
+
 const agentTokenInstructions = ` First generate a publish token from the Tabucom UI, pass it as TABUCOM_PUBLISH_TOKEN, and publish with Authorization: Bearer $TABUCOM_PUBLISH_TOKEN.`
+const agentAPIKeyInstructions = ` Pass the operator-provided key as TABUCOM_PUBLISH_API_KEY and publish with X-API-Key: $TABUCOM_PUBLISH_API_KEY.`
 const openPublishSummary = `Publishing requires no authentication; individual deployments may use one visitor password.`
 const tokenPublishSummary = `Publishing requires a token generated from the Tabucom UI; individual deployments may also use one visitor password.`
+const apiKeyPublishSummary = `Publishing requires an operator-provided API key; individual deployments may use one visitor password.`
+const apiKeyAndTokenPublishSummary = `Publishing requires both an operator-provided API key and a token generated from the Tabucom UI; individual deployments may use one visitor password.`
 
 // isWebPath reports whether a request addresses public discovery content.
 func isWebPath(requestPath string) bool {
@@ -127,19 +139,34 @@ func (s *Server) serveWebFile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) applyFeaturePlaceholders(data []byte) []byte {
 	tokenHTML := ""
 	tokenInstructions := ""
-	agentInstructions := ""
+	apiKeyInstructions := ""
+	tokenAgentInstructions := ""
+	apiKeyAgentInstructions := ""
 	publishingAuthentication := "none"
 	publishSummary := openPublishSummary
+	if len(s.cfg.PublishAPIKeys) > 0 {
+		apiKeyInstructions = llmsAPIKeyInstructions
+		apiKeyAgentInstructions = agentAPIKeyInstructions
+		publishingAuthentication = "api_key"
+		publishSummary = apiKeyPublishSummary
+	}
 	if s.cfg.StatelessPublishTokensEnabled {
 		tokenHTML = strings.ReplaceAll(tokenUI, "{{TOKEN_TTL}}", publishTokenTTLLabel(s.cfg.StatelessPublishTokenTTL))
 		tokenInstructions = llmsTokenInstructions
-		agentInstructions = agentTokenInstructions
-		publishingAuthentication = "stateless_bearer_token"
-		publishSummary = tokenPublishSummary
+		tokenAgentInstructions = agentTokenInstructions
+		if len(s.cfg.PublishAPIKeys) > 0 {
+			publishingAuthentication = "api_key_and_stateless_bearer_token"
+			publishSummary = apiKeyAndTokenPublishSummary
+		} else {
+			publishingAuthentication = "stateless_bearer_token"
+			publishSummary = tokenPublishSummary
+		}
 	}
 	data = bytes.ReplaceAll(data, []byte("{{TOKEN_UI}}"), []byte(tokenHTML))
 	data = bytes.ReplaceAll(data, []byte("\n{{PUBLISH_TOKEN_INSTRUCTIONS}}"), []byte(tokenInstructions))
-	data = bytes.ReplaceAll(data, []byte("{{AGENT_TOKEN_INSTRUCTIONS}}"), []byte(agentInstructions))
+	data = bytes.ReplaceAll(data, []byte("\n{{PUBLISH_API_KEY_INSTRUCTIONS}}"), []byte(apiKeyInstructions))
+	data = bytes.ReplaceAll(data, []byte("{{AGENT_API_KEY_INSTRUCTIONS}}"), []byte(apiKeyAgentInstructions))
+	data = bytes.ReplaceAll(data, []byte("{{AGENT_TOKEN_INSTRUCTIONS}}"), []byte(tokenAgentInstructions))
 	data = bytes.ReplaceAll(data, []byte("{{PUBLISHING_AUTHENTICATION}}"), []byte(publishingAuthentication))
 	data = bytes.ReplaceAll(data, []byte("{{PUBLISH_AUTH_SUMMARY}}"), []byte(publishSummary))
 	return data

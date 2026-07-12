@@ -52,6 +52,8 @@ type Config struct {
 	MaxFiles int
 	// RateLimitPerHour limits publications per remote address in this process.
 	RateLimitPerHour int
+	// PublishAPIKeys optionally requires one configured X-API-Key value to publish.
+	PublishAPIKeys []string
 	// StatelessPublishTokensEnabled requires signed bearer tokens on publishing.
 	StatelessPublishTokensEnabled bool
 	// StatelessTokenSigningSecret signs stateless publish tokens when enabled.
@@ -141,6 +143,9 @@ func ConfigFromEnv() (Config, error) {
 		return cfg, err
 	}
 	if cfg.RateLimitPerHour, err = intFromEnv("RATE_LIMIT_PER_HOUR", cfg.RateLimitPerHour); err != nil {
+		return cfg, err
+	}
+	if cfg.PublishAPIKeys, err = apiKeysFromEnv(os.Getenv("PUBLISH_API_KEYS")); err != nil {
 		return cfg, err
 	}
 	if cfg.StatelessPublishTokenTTL, err = durationFromEnv("STATELESS_PUBLISH_TOKEN_TTL", cfg.StatelessPublishTokenTTL); err != nil {
