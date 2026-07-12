@@ -112,8 +112,8 @@ For a small organization, the usual setup is:
 2. Put a reverse proxy in front of it, such as Caddy, Traefik, nginx, or your
    platform's ingress.
 3. Set `PUBLIC_API_URL` to the public HTTPS URL users will open.
-4. Enable publish tokens if people or LLMs outside a trusted network can reach
-   the service.
+4. Require publish API keys when the publish API is reachable outside a trusted
+   network.
 
 Example:
 
@@ -133,40 +133,49 @@ Your reverse proxy should send `https://tabucom.example.com` traffic to
 instructions copied from the home page. If you run locally, use
 `http://localhost:8080`. If you run on a VPS, use your real HTTPS URL.
 
-## Publish Tokens
+## Publish API Keys
 
 By default, publishing is open to anyone who can reach the service. That is fine
 for a private local machine or a trusted internal network.
 
-If Tabucom is exposed on a VPS or used by many people, enable stateless publish
-tokens:
+For a VPS used by one person or a small team, configure one or more random API
+keys in a comma-separated allow-list. They apply only to `POST /api/v1/publish`;
+published pages remain public. Keep keys out of URLs and source control.
 
 ```sh
 docker run -d --name tabucom \
   --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -e PUBLIC_API_URL=https://tabucom.example.com \
-  -e STATELESS_PUBLISH_TOKENS_ENABLED=true \
-  -e STATELESS_TOKEN_SIGNING_SECRET='change-this-to-a-long-random-secret-value' \
-  -e STATELESS_PUBLISH_TOKEN_TTL=720h \
+  -e PUBLISH_API_KEYS='replace-with-a-long-random-key,replace-with-your-next-key' \
   -v tabucom-data:/data \
   ghcr.io/markthebault/tabucom:latest
 ```
 
-When tokens are enabled:
+Generate a key with a password manager or:
 
-- the home page shows a "Generate Publish Token" button
-- a user can copy the token and give it to an LLM
-- the LLM can then publish documents to Tabucom
-- generated tokens are not stored in a database
-- expired or invalid tokens are rejected
+```sh
+openssl rand -hex 32
+```
 
-Use a signing secret of at least 32 characters. A password manager is a good way
-to generate it. Generated tokens are valid for one hour by default. Set
-`STATELESS_PUBLISH_TOKEN_TTL` to a positive Go-style duration such as `720h`
-for 30 days.
+Publish with one configured value:
 
-If you publish with a script while tokens are enabled, include this header:
+```sh
+-H "X-API-Key: $TABUCOM_PUBLISH_API_KEY"
+```
+
+Multiple keys make rotation safe: deploy with both the old and new key, update
+your scripts or agent secret, then remove the old key and restart Tabucom.
+
+## Publish Tokens
+
+Stateless publish tokens remain available for browser-mediated or delegated
+workflows. If enabled alongside `PUBLISH_API_KEYS`, both credentials are
+required for `POST /api/v1/publish`.
+
+Use a signing secret of at least 32 characters. Generated tokens are valid for
+one hour by default. Set `STATELESS_PUBLISH_TOKEN_TTL` to a positive Go-style
+duration such as `720h` for 30 days.
 
 ```sh
 -H "Authorization: Bearer $TABUCOM_PUBLISH_TOKEN"
@@ -264,7 +273,7 @@ curl -sS -X POST 'https://tabucom.example.com/api/v1/publish?generatePassword=1'
 ```
 
 Visitor passwords protect the published page. They do not protect the publish
-API. Use publish tokens for that.
+API. Use publish API keys or publish tokens for that.
 
 ## Copy Page HTML
 
@@ -295,8 +304,9 @@ Policy may block the floating button; `raw=1` remains available.
 
 Open the Tabucom home page and click "Copy setup instructions for my agent".
 
-If publish tokens are enabled, first click "Generate Publish Token", copy the
-token, and give it to the LLM when you ask it to publish.
+If publish API keys are enabled, give the agent one as
+`TABUCOM_PUBLISH_API_KEY`. If publish tokens are also enabled, first click
+"Generate Publish Token", copy the token, and give it to the agent too.
 
 The LLM instructions tell the agent to:
 
@@ -315,14 +325,15 @@ The same instructions are also available at:
 
 ## Configuration
 
-Most installations only need `PUBLIC_API_URL`, `DATA_DIR`, and optionally publish
-tokens.
+Most installations only need `PUBLIC_API_URL`, `DATA_DIR`, and a publish API key
+when the service is public.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `PUBLIC_API_URL` | request origin | Public URL used in responses and generated instructions |
 | `DATA_DIR` | `./data` | Local storage directory for deployments |
 | `TTL` | `720h` | Default lifetime when a request does not set `ttl` |
+| `PUBLISH_API_KEYS` | unset | Comma-separated keys accepted by `X-API-Key` for `POST /api/v1/publish` |
 | `STATELESS_PUBLISH_TOKENS_ENABLED` | `false` | Require a publish token for `POST /api/v1/publish` |
 | `STATELESS_TOKEN_SIGNING_SECRET` | unset | Secret used to sign publish tokens |
 | `STATELESS_PUBLISH_TOKEN_TTL` | `1h` | Lifetime of generated publish tokens, as a Go-style duration |
@@ -380,8 +391,8 @@ Your reverse proxy must route both `preview.example.com` and
 
 ## Safety Notes
 
-- Put Tabucom behind HTTPS before using passwords or publish tokens.
-- Enable publish tokens when the publish API is reachable outside a trusted
+- Put Tabucom behind HTTPS before using passwords, publish API keys, or tokens.
+- Enable publish API keys when the publish API is reachable outside a trusted
   network.
 - Published JavaScript runs in visitors' browsers.
 - Path-mode deployments share the same browser origin as Tabucom itself.

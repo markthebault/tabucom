@@ -82,6 +82,11 @@ type rateBucket struct {
 // publish coordinates validation, staging, and atomic commit. No deployment path
 // is visible until every input check and metadata write has succeeded.
 func (s *Server) publish(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePublishAPIKey(r) {
+		apiError(w, http.StatusUnauthorized, "unauthorized", "valid X-API-Key required")
+		return
+	}
+
 	if err := s.requirePublishToken(r); err != nil {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="tabucom-publish"`)
 		apiError(w, http.StatusUnauthorized, "unauthorized", "valid publish bearer token required")

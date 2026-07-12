@@ -48,6 +48,13 @@
             "required": false,
             "description": "Custom visitor password containing 8 to 128 printable ASCII characters. Never put custom passwords in URLs.",
             "schema": {"type": "string", "minLength": 8, "maxLength": 128}
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "description": "Required when the operator configures PUBLISH_API_KEYS. Send one configured key; never put it in a URL.",
+            "schema": {"type": "string"}
           }
         ],
         "requestBody": {

@@ -1,30 +1,42 @@
 ---
 name: tabucom
-description: Use Tabucom to publish temporary static HTML, Markdown, or already-built static ZIP artifacts for sharing with a user or another agent. Trigger when asked to publish a page, report, plan, spec, deck export, static app preview, or one-off HTML artifact to Tabucom.
+description: Use Tabucom to publish temporary static HTML, Markdown, or already-built static ZIP artifacts for sharing with a user or another agent. Use the configured TABUCOM_BASE_URL and optional publish credentials automatically. Trigger when asked to publish a page, report, plan, spec, deck export, static app preview, or one-off HTML artifact to Tabucom.
 ---
 
 # Tabucom Publishing
 
 Use Tabucom when an agent needs to publish an immutable temporary static artifact and return a shareable deployment URL plus its expiry.
 
-This skill intentionally does not include a fixed Tabucom URL, token, or security policy. The deployment origin and authentication settings depend on the environment. Discover them from the user, local docs, environment variables, or the page contract provided in the current task.
+This skill intentionally contains no fixed deployment URL or secret. Read the
+operator-provided environment variables before publishing; use them directly
+without asking the user to repeat setup they have already configured.
 
 ## Required Inputs
 
-Before publishing, identify:
+Before publishing, read:
 
 - `TABUCOM_BASE_URL`: the origin of the Tabucom service, without a trailing slash.
-- Optional `TABUCOM_PUBLISH_TOKEN`: bearer token for services that require publish tokens.
+- Optional `TABUCOM_PUBLISH_API_KEY`: key for instances configured with `PUBLISH_API_KEYS`.
+- Optional `TABUCOM_PUBLISH_TOKEN`: bearer token for instances that require publish tokens.
 - The artifact type: raw HTML, Markdown, or a ZIP of already-built static files.
 - Optional publish settings: `ttl`, `spa`, `prefix`, `generatePassword`, or a visitor password.
 
-If the base URL or token is unknown, ask for it or use an explicit value already present in the task context. Do not guess a production URL.
+Require `TABUCOM_BASE_URL`. If it is absent, use an explicit origin from the
+task context; otherwise ask for it. Do not guess a production URL. Never print,
+log, or return credential values.
 
-When publish tokens are enabled, add this header to the `curl` commands:
+Build headers from the environment before each publish. Include every available
+credential: instances with both API keys and publish tokens require both.
 
 ```sh
--H "Authorization: Bearer $TABUCOM_PUBLISH_TOKEN"
+tabucom_headers=()
+[[ -n "${TABUCOM_PUBLISH_API_KEY:-}" ]] && tabucom_headers+=(-H "X-API-Key: $TABUCOM_PUBLISH_API_KEY")
+[[ -n "${TABUCOM_PUBLISH_TOKEN:-}" ]] && tabucom_headers+=(-H "Authorization: Bearer $TABUCOM_PUBLISH_TOKEN")
 ```
+
+Pass `"${tabucom_headers[@]}"` to every `POST /api/v1/publish` command below.
+If publishing returns `401` and no credential environment variable is present,
+ask the operator for the required credential rather than disabling protection.
 
 ## Safety Rules
 
@@ -42,6 +54,7 @@ Use `text/html` for complete HTML files:
 
 ```sh
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: text/html' \
   --data-binary @/absolute/path/to/page.html
 ```
@@ -50,6 +63,7 @@ With a TTL:
 
 ```sh
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish?ttl=72h" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: text/html' \
   --data-binary @/absolute/path/to/page.html
 ```
@@ -60,6 +74,7 @@ Use `text/markdown` when Tabucom should render a Markdown document:
 
 ```sh
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: text/markdown' \
   --data-binary @/absolute/path/to/report.md
 ```
@@ -72,6 +87,7 @@ Build the site locally with the project's normal command, then ZIP the built out
 (cd /absolute/path/to/dist && zip -qr /tmp/site.zip .)
 
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: application/zip' \
   --data-binary @/tmp/site.zip
 ```
@@ -80,6 +96,7 @@ For a client-side-routed single-page app, enable SPA fallback:
 
 ```sh
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish?spa=1" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: application/zip' \
   --data-binary @/tmp/site.zip
 ```
@@ -99,6 +116,7 @@ Use `Tabucom-Password` when the user provides a visitor password for the publish
 
 ```sh
 curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish?ttl=72h" \
+  "${tabucom_headers[@]}" \
   -H 'Content-Type: text/html' \
   -H "Tabucom-Password: $TABUCOM_VISITOR_PASSWORD" \
   --data-binary @/absolute/path/to/page.html
@@ -158,9 +176,9 @@ Smoke-test all accepted input forms against a running local server:
 ```sh
 printf '<!doctype html><title>smoke</title><h1>ok</h1>' > /tmp/site.html
 printf '# smoke\n\nMarkdown works.\n' > /tmp/site.md
-curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" -H 'Content-Type: text/html' --data-binary @/tmp/site.html
-curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" -H 'Content-Type: text/markdown' --data-binary @/tmp/site.md
+curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" "${tabucom_headers[@]}" -H 'Content-Type: text/html' --data-binary @/tmp/site.html
+curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish" "${tabucom_headers[@]}" -H 'Content-Type: text/markdown' --data-binary @/tmp/site.md
 mkdir -p /tmp/static-site && cp /tmp/site.html /tmp/static-site/index.html
 (cd /tmp/static-site && zip -qr /tmp/static-site.zip .)
-curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish?spa=1" -H 'Content-Type: application/zip' --data-binary @/tmp/static-site.zip
+curl -fsS -X POST "$TABUCOM_BASE_URL/api/v1/publish?spa=1" "${tabucom_headers[@]}" -H 'Content-Type: application/zip' --data-binary @/tmp/static-site.zip
 ```
