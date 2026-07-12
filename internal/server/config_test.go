@@ -8,6 +8,7 @@ with each test using isolated process environment values.
 package server
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -24,6 +25,7 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("TTL", "720h")
 	t.Setenv("MAX_FILES", "25")
 	t.Setenv("RATE_LIMIT_PER_HOUR", "7")
+	t.Setenv("PUBLISH_API_KEYS", "first-key, second-key")
 	t.Setenv("STATELESS_PUBLISH_TOKENS_ENABLED", "true")
 	t.Setenv("STATELESS_TOKEN_SIGNING_SECRET", "12345678901234567890123456789012")
 	t.Setenv("STATELESS_PUBLISH_TOKEN_TTL", "720h")
@@ -41,6 +43,7 @@ func TestConfigFromEnv(t *testing.T) {
 		config.TTL != deploymentTTL ||
 		config.MaxFiles != 25 ||
 		config.RateLimitPerHour != 7 ||
+		!reflect.DeepEqual(config.PublishAPIKeys, []string{"first-key", "second-key"}) ||
 		!config.StatelessPublishTokensEnabled ||
 		config.StatelessPublishTokenTTL != 30*24*time.Hour ||
 		config.StatelessTokenSigningSecret == "" {
@@ -98,6 +101,8 @@ func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {
 		{name: "negative expanded size", key: "MAX_EXPANDED_BYTES", value: "-1"},
 		{name: "zero file count", key: "MAX_FILES", value: "0"},
 		{name: "zero rate limit", key: "RATE_LIMIT_PER_HOUR", value: "0"},
+		{name: "empty publish API key", key: "PUBLISH_API_KEYS", value: "first-key,,second-key"},
+		{name: "duplicate publish API key", key: "PUBLISH_API_KEYS", value: "same-key,same-key"},
 		{name: "invalid stateless token flag", key: "STATELESS_PUBLISH_TOKENS_ENABLED", value: "maybe"},
 		{name: "invalid stateless token duration", key: "STATELESS_PUBLISH_TOKEN_TTL", value: "one-month"},
 		{name: "zero stateless token duration", key: "STATELESS_PUBLISH_TOKEN_TTL", value: "0s"},

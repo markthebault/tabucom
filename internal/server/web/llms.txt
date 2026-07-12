@@ -22,6 +22,7 @@ If the user asks for a specific lifetime, readable URL name, client-side routing
 7. After success, mention that future publishes can set `ttl`, `prefix`, `spa`, or password protection when useful.
 8. On failure: read the HTTP status and response body, explain the cause briefly, and suggest the smallest correction.
 {{PUBLISH_TOKEN_INSTRUCTIONS}}
+{{PUBLISH_API_KEY_INSTRUCTIONS}}
 
 ## API
 
