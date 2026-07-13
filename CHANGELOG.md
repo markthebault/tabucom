@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/markthebault/tabucom/compare/v0.4.0...v0.5.0) (2026-07-13)
+
+
+### Features
+
+* require publish API keys ([b1c63e7](https://github.com/markthebault/tabucom/commit/b1c63e747d10b99d83548dc51c4fab9627fd2754))
+* require publish API keys ([fc8c245](https://github.com/markthebault/tabucom/commit/fc8c245c95dd23b8c88a0315ab93ffb944ba4b9c))
+* require publish API keys ([a0f0e61](https://github.com/markthebault/tabucom/commit/a0f0e61ec91322a0cf9f119612757761d864492d))
+* require publish API keys ([beca351](https://github.com/markthebault/tabucom/commit/beca3519088b3bbfd51ff13b5164960fb9a8e6ac))
+
 ## [0.4.0](https://github.com/markthebault/tabucom/compare/v0.3.0...v0.4.0) (2026-07-10)
 
 
