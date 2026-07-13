@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/markthebault/tabucom/compare/v0.5.1...v0.6.0) (2026-07-13)
+
+
+### Features
+
+* add skill installer CLI ([04cc4ed](https://github.com/markthebault/tabucom/commit/04cc4edba242e4898306d35a3612922c9305f865))
+* add skill installer CLI ([f1b1bf1](https://github.com/markthebault/tabucom/commit/f1b1bf1717493e981b9e5f83c200299545bba985))
+
 ## [0.5.1](https://github.com/markthebault/tabucom/compare/v0.5.0...v0.5.1) (2026-07-13)
 
 
