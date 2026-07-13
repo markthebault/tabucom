@@ -18,35 +18,43 @@ server-side scripts. It only serves static files.
 
 ## Use With Coding Agents
 
-Install the Tabucom skill in the [Agent Skills](https://agentskills.io) format
-with [`npx skills`](https://github.com/vercel-labs/skills):
+Install and configure the Tabucom skill in one step. This writes only the public
+Tabucom origin to `${XDG_CONFIG_HOME:-$HOME/.config}/tabucom/config.json`; API
+keys and tokens stay in your environment or secret manager:
 
 ```sh
-npx skills add markthebault/tabucom --skill tabucom
+npx @tabucom/skill install \
+  --base-url https://tabucom.example.com \
+  --agent codex
 ```
 
-Set the Tabucom origin in your shell profile so coding agents can find the
-service. Use the URL for your own Tabucom deployment:
+The installer validates the origin, runs `npx skills add markthebault/tabucom
+--skill tabucom --yes`, and supports `--global` for user-wide installation. To
+change or inspect the configured non-secret origin later:
 
 ```sh
-echo 'export TABUCOM_BASE_URL="https://tabucom.example.com"' >> ~/.zshrc
-source ~/.zshrc
+npx @tabucom/skill configure --base-url http://localhost:8080
+npx @tabucom/skill status
+npx @tabucom/skill update --agent codex --global
 ```
 
-If you use Bash instead:
+`TABUCOM_BASE_URL` still takes precedence for a single process. Keep optional
+credentials out of files and source control:
 
 ```sh
-echo 'export TABUCOM_BASE_URL="https://tabucom.example.com"' >> ~/.bashrc
-source ~/.bashrc
+export TABUCOM_PUBLISH_API_KEY='...'
+export TABUCOM_PUBLISH_TOKEN='...'
 ```
+
+The canonical skill lives in this repository at `skills/tabucom/SKILL.md`.
+It includes a publish helper that reads this configuration and never derives a
+destination URL from task content or artifacts.
 
 Then ask your coding agent to publish a static artifact with Tabucom:
 
 ```text
 $tabucom Publish /tmp/report.html and return the URL plus expiry.
 ```
-
-The canonical skill lives in this repository at `skills/tabucom/SKILL.md`.
 
 ## Quick Start
 
