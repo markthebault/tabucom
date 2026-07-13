@@ -1,0 +1,31 @@
+{
+  "name": "@tabucom/skill",
+  "version": "0.1.0",
+  "description": "Install and configure the Tabucom Agent Skill without storing credentials.",
+  "license": "MIT",
+  "repository": "github:markthebault/tabucom",
+  "homepage": "https://github.com/markthebault/tabucom#readme",
+  "keywords": [
+    "tabucom",
+    "agent-skills",
+    "codex"
+  ],
+  "type": "module",
+  "bin": {
+    "tabucom-skill": "bin/tabucom-skill.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
